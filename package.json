@@ -1,0 +1,12 @@
+{
+  "name": "mediaflow",
+  "version": "0.1.0",
+  "description": "Modular video subtitle processing workstation",
+  "private": true,
+  "scripts": {
+    "dev": "npm run electron:dev --prefix frontend",
+    "build": "npm run build --prefix frontend",
+    "preview": "npm run preview --prefix frontend",
+    "install:frontend": "npm install --prefix frontend"
+  }
+}

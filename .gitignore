@@ -1,0 +1,27 @@
+# Legacy Archive
+Archive/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+site-packages/
+
+# Generated/Large Directories
+temp/
+models/
+example/
+output/
+bin/
+data/
+
+# Node
+node_modules/
+dist/
+dist-electron/
+.vscode/
+
+# Logs
+*.log

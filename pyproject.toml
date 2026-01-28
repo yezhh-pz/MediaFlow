@@ -1,0 +1,27 @@
+[project]
+name = "mediaflow-core"
+version = "0.1.0"
+description = "The headless AI media processing engine for MediaFlow."
+authors = [
+    {name = "Weifeng", email = "author@example.com"},
+]
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.2.0",
+    "loguru>=0.7.2",
+    "yt-dlp>=2023.12.30",
+    "faster-whisper>=1.0.0",
+    "python-multipart>=0.0.9",
+]
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = true

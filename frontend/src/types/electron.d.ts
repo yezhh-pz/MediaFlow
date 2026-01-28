@@ -1,0 +1,35 @@
+/**
+ * Type definitions for Electron IPC API exposed via preload.ts
+ * This eliminates the need for @ts-ignore when using window.electronAPI
+ */
+
+interface ElectronAPI {
+  /** Send a message to the main process */
+  sendMessage: (message: unknown) => void;
+
+  /** Open native file dialog and return selected file path */
+  openFile: () => Promise<string | null>;
+
+  /** Read file content from local filesystem */
+  readFile: (filePath: string) => Promise<string | null>;
+
+  /** Show file in system explorer/finder */
+  showInExplorer: (filePath: string) => Promise<void>;
+
+  /** Fetch cookies for a specific URL via Electron session */
+  fetchCookies: (targetUrl: string) => Promise<unknown[]>;
+
+  /** Extract data from Douyin (deprecated, backend handles this now) */
+  extractDouyinData: (
+    url: string,
+  ) => Promise<{ error?: string; [key: string]: unknown }>;
+}
+
+interface Window {
+  electronAPI?: ElectronAPI;
+}
+
+/** Electron File object has an additional 'path' property for local files */
+interface File {
+  readonly path?: string;
+}
