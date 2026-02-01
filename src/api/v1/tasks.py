@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from src.services.task_manager import task_manager
 from src.core.pipeline import pipeline_runner
-from src.models.schemas import PipelineRequest
+from src.models.schemas import PipelineRequest, TranscribeRequest
+from src.api.v1.transcribe import run_transcription_task
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
@@ -25,17 +26,17 @@ async def resume_task(task_id: str, background_tasks: BackgroundTasks):
         return {"message": "Task is already running", "status": "running"}
 
     # Reset task state
-    # We keep the ID but reset status. 
-    # NOTE: To truly "resume" yt-dlp, we rely on its internal .part file checks.
-    # We just re-issue the command.
-    
     await task_manager.update_task(task_id, status="pending", message="Resuming...", error=None, result=None, cancelled=False)
     
-    # Re-construct steps from params
-    # The params stored are the dict representation of PipelineRequest
     try:
-        req = PipelineRequest(**task.request_params)
-        background_tasks.add_task(pipeline_runner.run, req.steps, task_id)
+        if task.type == "transcribe":
+            req = TranscribeRequest(**task.request_params)
+            background_tasks.add_task(run_transcription_task, task_id, req)
+        else:
+            # Default to pipeline/download
+            req = PipelineRequest(**task.request_params)
+            background_tasks.add_task(pipeline_runner.run, req.steps, task_id)
+            
     except Exception as e:
          raise HTTPException(status_code=500, detail=f"Failed to restart task: {e}")
 

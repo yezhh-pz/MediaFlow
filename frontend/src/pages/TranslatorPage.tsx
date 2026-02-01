@@ -1,21 +1,50 @@
-import React, { useState } from 'react';
-import { useTaskContext } from '../context/TaskContext';
-import { ArrowLeftRight, Wand2, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { API_BASE } from '../api/client';
+import { ArrowLeftRight, Wand2, FolderOpen } from 'lucide-react';
 
 interface SubtitleSegment {
   id: number;
-  start: float;
-  end: float;
+  start: number;
+  end: number;
   text: string;
 }
 
 export const TranslatorPage = () => {
-  const [sourceText, setSourceText] = useState("");
-  const [targetText, setTargetText] = useState("");
+  const [sourceText, setSourceText] = useState(() => localStorage.getItem("translator_sourceText") || "");
+  const [targetText, setTargetText] = useState(() => localStorage.getItem("translator_targetText") || "");
   const [targetLang, setTargetLang] = useState("English");
   const [mode, setMode] = useState("standard");
   const [isTranslating, setIsTranslating] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  // Persistence
+  useEffect(() => {
+    localStorage.setItem("translator_sourceText", sourceText);
+  }, [sourceText]);
+
+  useEffect(() => {
+    localStorage.setItem("translator_targetText", targetText);
+  }, [targetText]);
+
+  const handleOpenFile = async () => {
+    if (window.electronAPI) {
+      try {
+        const fileData = await window.electronAPI.openFile() as any;
+        if (fileData && fileData.path) {
+           const content = await window.electronAPI.readFile(fileData.path);
+           if (content) {
+               setSourceText(content);
+           }
+        }
+      } catch (e) {
+          console.error("Failed to open file:", e);
+          alert("Failed to read file");
+      }
+    } else {
+        // Fallback for web (optional)
+        alert("File access requires Electron environment");
+    }
+  };
 
   const handleTranslate = async () => {
     if (!sourceText) return;
@@ -26,14 +55,14 @@ export const TranslatorPage = () => {
       // Mocking segment parsing for now - in reality we might pass JSON object directly
       // Or parse SRT. For simple demo, let's treat lines as segments.
       const lines = sourceText.split('\n').filter(l => l.trim());
-      const segments = lines.map((line, idx) => ({
+      const segments: SubtitleSegment[] = lines.map((line, idx) => ({
         id: idx + 1,
         start: 0,
         end: 0,
         text: line
       }));
 
-      const response = await fetch('http://127.0.0.1:8000/api/v1/translate/', {
+      const response = await fetch(`${API_BASE}/translate/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -45,16 +74,9 @@ export const TranslatorPage = () => {
 
       if (!response.ok) throw new Error("Translation failed");
       
-      const reader = response.body?.getReader();
       // Handle streaming progress if implemented, or just wait for JSON
       // Assuming non-streaming for now but async task based
       const data = await response.json();
-      
-      // If task based, we poll. If sync, we get result.
-      // Let's assume sync for small batches or task based for large.
-      // For this UI demo, let's assume direct return for simplicity or update this to polling.
-      // Given the previous pattern, let's stick to task polling if time permits, 
-      // but for "Start" let's implement basic sync wrapper or simplified task.
       
       if (data.segments) {
         const translatedLines = data.segments.map((s: any) => s.text).join('\n');
@@ -68,6 +90,8 @@ export const TranslatorPage = () => {
       alert("Translation failed");
     } finally {
       setIsTranslating(false);
+      // Reset progress after a delay if needed, or keep 100%
+      setTimeout(() => setProgress(0), 2000);
     }
   };
 
@@ -86,11 +110,31 @@ export const TranslatorPage = () => {
           </div>
         </div>
       </header>
+      
+      {/* Progress Bar */}
+      {progress > 0 && (
+          <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+              <div 
+                  className="h-full bg-indigo-500 transition-all duration-300 ease-out"
+                  style={{ width: `${progress}%` }}
+              />
+          </div>
+      )}
 
       <div className="grid grid-cols-2 gap-6 h-full min-h-0">
         {/* Source Column */}
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-slate-400">Source Subtitles</label>
+          <div className="flex justify-between items-center">
+             <label className="text-sm font-medium text-slate-400">Source Subtitles</label>
+             <button 
+                 onClick={handleOpenFile}
+                 className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-medium text-slate-300 transition-all hover:text-indigo-400"
+                 title="Open SRT File"
+             >
+                 <FolderOpen className="w-3.5 h-3.5" />
+                 Open File
+             </button>
+          </div>
           <textarea
             className="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-4 font-mono text-sm focus:outline-none focus:border-indigo-500 resize-none"
             placeholder="Paste source text or SRT content here..."
@@ -119,8 +163,8 @@ export const TranslatorPage = () => {
                  onChange={(e) => setMode(e.target.value)}
                  className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs"
                >
-                 <option value="standard">Standard</option>
-                 <option value="reflect">Reflect (Slower, Better)</option>
+                  <option value="standard">Standard (Strict 1-to-1)</option>
+                  <option value="intelligent">Intelligent (Auto-Split/Merge)</option>
                </select>
                <button 
                  onClick={handleTranslate}

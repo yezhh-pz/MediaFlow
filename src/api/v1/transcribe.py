@@ -34,6 +34,7 @@ async def run_transcription_task(task_id: str, req: TranscribeRequest):
                 device=req.device,
                 language=req.language,
                 task_id=task_id,
+                initial_prompt=req.initial_prompt,
                 progress_callback=sync_progress_callback
             )
         )
@@ -63,6 +64,7 @@ async def transcribe_audio(req: TranscribeRequest, background_tasks: BackgroundT
     Start an asynchronous transcription task.
     Returns a Task ID to track progress.
     """
+    logger.info(f"Received transcription request: {req.dict()}")
     try:
         # Create Task
         task_id = task_manager.create_task(

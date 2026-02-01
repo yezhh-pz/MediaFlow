@@ -14,3 +14,27 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Custom Scrollbar for Dark Theme */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4b5563; /* slate-600 */
+  border-radius: 5px;
+  border: 2px solid #242424; /* matches bg to create padding effect */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7280; /* slate-500 */
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}

@@ -4,7 +4,7 @@ from typing import List, Optional
 from loguru import logger
 
 from src.models.schemas import SubtitleSegment, TaskResponse
-from src.services.llm_translator import llm_translator
+from src.services.translator.llm_translator import llm_translator
 from src.services.task_manager import task_manager
 import asyncio
 

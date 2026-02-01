@@ -1,3 +1,4 @@
+// @ts-ignore
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
@@ -10,5 +11,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   fetchCookies: (targetUrl: string) =>
     ipcRenderer.invoke("cookies:fetch", targetUrl),
   // Data extraction
+  // Data extraction
   extractDouyinData: (url: string) => ipcRenderer.invoke("douyin:extract", url),
+  // File Utils
+  getPathForFile: (file: File) =>
+    // @ts-ignore
+    require("electron").webUtils.getPathForFile(file),
 });

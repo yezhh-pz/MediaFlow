@@ -37,25 +37,32 @@ class BilibiliPlatform(BasePlatform):
                 logger.warning(f"Bilibili API Error: {data['message']}")
                 return None
 
-            video_data = data["data"]
-            pages = video_data.get("pages", [])
-
-            # logic:
-            # 1. Check for UGC Season (Collection/List) - "合集"
-            if "ugc_season" in video_data:
-                collection_result = self._construct_collection(url, video_data)
-                if collection_result:
-                    return collection_result
-
-            # 2. Check for Multi-page Video (Old style) - "分P"
-            if len(pages) > 1:
-                return self._construct_playlist(url, video_data, pages)
-            
-            return None # Fallback to yt-dlp for single video
+            return self._parse_api_response(url, data)
 
         except Exception as e:
             logger.error(f"Bilibili Platform Analysis Failed: {e}")
             return None
+
+    def _parse_api_response(self, url: str, data: dict) -> Optional[AnalyzeResult]:
+        """
+        Parse Bilibili API response (extracted for testability).
+        Raises KeyError/ValueError if critical fields are missing.
+        """
+        video_data = data["data"]
+        pages = video_data.get("pages", [])
+
+        # logic:
+        # 1. Check for UGC Season (Collection/List) - "合集"
+        if "ugc_season" in video_data:
+            collection_result = self._construct_collection(url, video_data)
+            if collection_result:
+                return collection_result
+
+        # 2. Check for Multi-page Video (Old style) - "分P"
+        if len(pages) > 1:
+            return self._construct_playlist(url, video_data, pages)
+        
+        return None # Fallback to yt-dlp for single video
 
     def _extract_bvid(self, url: str) -> Optional[str]:
         match = self.BV_PATTERN.search(url)

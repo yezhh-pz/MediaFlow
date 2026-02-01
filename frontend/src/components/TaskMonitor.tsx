@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTaskContext } from '../context/TaskContext';
-import { CheckCircle, AlertCircle, Loader, Clock, Pause, Play, Trash2 } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader, Clock, Pause, Play, Trash2, FolderOpen } from 'lucide-react';
 
 const ProgressBar: React.FC<{ progress: number }> = ({ progress }) => (
   <div style={{ width: '100%', height: 6, background: '#333', borderRadius: 3, marginTop: 8, overflow: 'hidden' }}>
@@ -15,10 +15,15 @@ const ProgressBar: React.FC<{ progress: number }> = ({ progress }) => (
   </div>
 );
 
-export const TaskMonitor: React.FC = () => {
+export const TaskMonitor: React.FC<{ filterTypes?: string[] }> = ({ filterTypes }) => {
     const { tasks, cancelTask, connected } = useTaskContext();
 
-    if (tasks.length === 0) {
+    const filteredTasks = React.useMemo(() => {
+        if (!filterTypes || filterTypes.length === 0) return tasks;
+        return tasks.filter(t => filterTypes.includes(t.type));
+    }, [tasks, filterTypes]);
+
+    if (filteredTasks.length === 0) {
         return null; // Or show empty state?
     }
 
@@ -107,7 +112,7 @@ export const TaskMonitor: React.FC = () => {
             </div>
             
             <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-                {tasks.map(task => (
+                {filteredTasks.map(task => (
                     <div key={task.id} style={{ padding: '15px 20px', borderBottom: '1px solid #333' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -157,6 +162,24 @@ export const TaskMonitor: React.FC = () => {
                                 >
                                     <Trash2 size={16} color="#6b7280" />
                                 </button>
+                                
+                                {/* Open Folder Button for Completed Downloads */}
+                                {task.status === 'completed' && task.result?.video_path && (
+                                    <button
+                                        onClick={() => {
+                                             const path = task.result.video_path;
+                                             if ((window as any).electronAPI) {
+                                                 (window as any).electronAPI.showInExplorer(path);
+                                             } else {
+                                                 alert(`File path: ${path}`);
+                                             }
+                                        }}
+                                        title="Show file in folder"
+                                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, marginLeft: 4 }}
+                                    >
+                                        <FolderOpen size={16} color="#3b82f6" />
+                                    </button>
+                                )}
                             </div>
                         </div>
                         

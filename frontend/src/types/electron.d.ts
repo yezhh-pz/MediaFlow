@@ -23,6 +23,9 @@ interface ElectronAPI {
   extractDouyinData: (
     url: string,
   ) => Promise<{ error?: string; [key: string]: unknown }>;
+
+  /** Get full path from File object (for Drag & Drop) */
+  getPathForFile: (file: File) => string;
 }
 
 interface Window {

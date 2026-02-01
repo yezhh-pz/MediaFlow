@@ -17,7 +17,8 @@ async def lifespan(app: FastAPI):
     
     # Initialize Core Services
     from src.services.browser_service import browser_service
-    await browser_service.start()
+    # await browser_service.start() # Lazy load to save RAM
+    
     
     logger.info(f"Directories initialized at {settings.BASE_DIR}")
     yield

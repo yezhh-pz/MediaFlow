@@ -19,7 +19,8 @@ class Settings(BaseSettings):
     BIN_DIR: Path = BASE_DIR / "bin"
     
     # Executables
-    FFMPEG_PATH: str = "ffmpeg" # Default to system path
+    FFMPEG_PATH: str = "ffmpeg"
+    FFPROBE_PATH: str = "ffprobe"
 
     # LLM Settings (Translator) - Must be set in .env file
     LLM_API_KEY: str = ""  # Required: Set VITE_LLM_API_KEY in .env
@@ -27,6 +28,18 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "gpt-3.5-turbo"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
+    def model_post_init(self, __context):
+        """Auto-detect local binaries."""
+        local_ffmpeg = self.BIN_DIR / "ffmpeg.exe"
+        if local_ffmpeg.exists():
+            self.FFMPEG_PATH = str(local_ffmpeg)
+            
+        local_ffprobe = self.BIN_DIR / "ffprobe.exe"
+        if local_ffprobe.exists():
+            self.FFPROBE_PATH = str(local_ffprobe)
+            
+        self.init_dirs()
 
     def init_dirs(self):
         """Ensure critical directories exist."""

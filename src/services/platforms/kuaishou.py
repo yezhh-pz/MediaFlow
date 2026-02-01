@@ -64,63 +64,71 @@ class KuaishouPlatform(BasePlatform):
         """
         
         logger.info(f"[Kuaishou] Step 4: Launching Tasks")
-        # Task 1: Sniff Video
-        # BrowserService will now handle stealth UA rotation automatically
-        task_video = browser_service.sniff(url, custom_js=None) 
         
-        # Task 2: Extract Title
-        # We rely on the stealth context to bypass the block.
-        # The JS script will try to extract from Apollo State or fallback to DOM.
-        task_title = browser_service.get_page_info(url, custom_js=js_script)
-        
-        results = await asyncio.gather(task_video, task_title, return_exceptions=True)
-        logger.info(f"[Kuaishou] Step 5: Tasks Completed")
-        
-        sniff_result = results[0]
-        page_info = results[1]
-        
-        # Initialize variables early to prevent UnboundLocalError
-        direct_url = None
-        title = f"Kuaishou Video {video_id or 'unknown'}"
-        
-        # Process Video Result
-        logger.info(f"[Kuaishou] Step 6: Processing Sniff Result")
-        if isinstance(sniff_result, dict) and sniff_result.get("url"):
-            direct_url = sniff_result.get("url")
-            logger.success(f"[Kuaishou] URL Found: {direct_url[:30]}...")
-        elif isinstance(sniff_result, Exception):
-            logger.error(f"[Kuaishou] Sniff Error: {sniff_result}")
-        
-        if not direct_url:
-            raise Exception("Failed to sniff video URL from Kuaishou.")
-
-        # Process Title Result
-        logger.info(f"[Kuaishou] Step 7: Processing Title Info")
-        if isinstance(page_info, dict):
-            logger.info(f"[Kuaishou] Page Info Debug: {page_info.get('debug', 'No Debug Info')}")
+        try:
+            # Ensure browser is running
+            await browser_service.start()
             
-            extracted_title = page_info.get("title")
-            if extracted_title and len(extracted_title) > 1:
-                title = extracted_title
-                logger.success(f"[Kuaishou] Title Extracted: {title}")
-        
-        # Final Cleanup
-        logger.info(f"[Kuaishou] Step 8: Finalizing")
-        title = str(title).replace(" - 快手", "").strip()
+            # Task 1: Sniff Video
+            # BrowserService will now handle stealth UA rotation automatically
+            task_video = browser_service.sniff(url, custom_js=None) 
+            
+            # Task 2: Extract Title
+            # We rely on the stealth context to bypass the block.
+            # The JS script will try to extract from Apollo State or fallback to DOM.
+            task_title = browser_service.get_page_info(url, custom_js=js_script)
+            
+            results = await asyncio.gather(task_video, task_title, return_exceptions=True)
+            logger.info(f"[Kuaishou] Step 5: Tasks Completed")
+            
+            sniff_result = results[0]
+            page_info = results[1]
+            
+            # Initialize variables early to prevent UnboundLocalError
+            direct_url = None
+            title = f"Kuaishou Video {video_id or 'unknown'}"
+            
+            # Process Video Result
+            logger.info(f"[Kuaishou] Step 6: Processing Sniff Result")
+            if isinstance(sniff_result, dict) and sniff_result.get("url"):
+                direct_url = sniff_result.get("url")
+                logger.success(f"[Kuaishou] URL Found: {direct_url[:30]}...")
+            elif isinstance(sniff_result, Exception):
+                logger.error(f"[Kuaishou] Sniff Error: {sniff_result}")
+            
+            if not direct_url:
+                raise Exception("Failed to sniff video URL from Kuaishou.")
 
-        return AnalyzeResult(
-            type="single",
-            platform="kuaishou",
-            id=video_id or "unknown",
-            title=title,
-            url=url,
-            direct_src=direct_url,
-            extra_info={
-                'platform': 'kuaishou',
-                'video_id': video_id,
-                'debug_log': page_info.get('debug') if isinstance(page_info, dict) else str(page_info)
-            }
-        )
+            # Process Title Result
+            logger.info(f"[Kuaishou] Step 7: Processing Title Info")
+            if isinstance(page_info, dict):
+                logger.info(f"[Kuaishou] Page Info Debug: {page_info.get('debug', 'No Debug Info')}")
+                
+                extracted_title = page_info.get("title")
+                if extracted_title and len(extracted_title) > 1:
+                    title = extracted_title
+                    logger.success(f"[Kuaishou] Title Extracted: {title}")
+            
+            # Final Cleanup
+            logger.info(f"[Kuaishou] Step 8: Finalizing")
+            title = str(title).replace(" - 快手", "").strip()
+
+            return AnalyzeResult(
+                type="single",
+                platform="kuaishou",
+                id=video_id or "unknown",
+                title=title,
+                url=url,
+                direct_src=direct_url,
+                extra_info={
+                    'platform': 'kuaishou',
+                    'video_id': video_id,
+                    'debug_log': page_info.get('debug') if isinstance(page_info, dict) else str(page_info)
+                }
+            )
+        finally:
+            # Ensure browser resources are released
+            await browser_service.stop()
 
     def _extract_id(self, url: str) -> Optional[str]:
         # web link: https://www.kuaishou.com/short-video/3xi3kxtvsx782gu

@@ -38,28 +38,35 @@ class DouyinPlatform(BasePlatform):
         from src.services.browser_service import browser_service
         
         logger.info(f"[Douyin] Sniffing video URL via Playwright...")
-        sniff_result = await browser_service.sniff(url)
-        
-        if not sniff_result or not sniff_result.get("url"):
-            raise Exception("Failed to sniff video URL from Douyin.")
+        try:
+            # Ensure browser is started (it checks internally)
+            await browser_service.start()
+            
+            sniff_result = await browser_service.sniff(url)
+            
+            if not sniff_result or not sniff_result.get("url"):
+                raise Exception("Failed to sniff video URL from Douyin.")
 
-        direct_url = sniff_result.get("url")
-        # Use sniffed title, fallback to generic ID-based title
-        title = sniff_result.get("title") or f"Douyin Video {video_id}"
+            direct_url = sniff_result.get("url")
+            # Use sniffed title, fallback to generic ID-based title
+            title = sniff_result.get("title") or f"Douyin Video {video_id}"
 
-        # 3. Construct result
-        return AnalyzeResult(
-            type="single",
-            platform="douyin",
-            id=video_id,
-            title=title,
-            url=url,
-            direct_src=direct_url,
-            extra_info={
-                'video_id': video_id,
-                'platform': 'douyin'
-            }
-        )
+            # 3. Construct result
+            return AnalyzeResult(
+                type="single",
+                platform="douyin",
+                id=video_id,
+                title=title,
+                url=url,
+                direct_src=direct_url,
+                extra_info={
+                    'video_id': video_id,
+                    'platform': 'douyin'
+                }
+            )
+        finally:
+            # Always stop the browser to free memory
+            await browser_service.stop()
     
     def _extract_video_id(self, url: str) -> Optional[str]:
         """从 URL 中提取视频 ID"""

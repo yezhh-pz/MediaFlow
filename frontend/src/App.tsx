@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./App.css";
 import { Layout } from "./components/layout/Layout";
 import { EditorPage } from "./pages/EditorPage";
+import { DashboardPage } from "./pages/DashboardPage";
 import { DownloaderPage } from "./pages/DownloaderPage";
 import { TranscriberPage } from "./pages/TranscriberPage";
 import { TranslatorPage } from "./pages/TranslatorPage";
@@ -10,11 +11,20 @@ import { TaskProvider } from "./context/TaskContext";
 
 function App() {
   const [activeTab, setActiveTab] = useState("editor");
+  
+  // Event-based navigation
+  useEffect(() => {
+    const handleNav = (e: any) => {
+        if (e.detail) setActiveTab(e.detail);
+    };
+    window.addEventListener('mediaflow:navigate', handleNav);
+    return () => window.removeEventListener('mediaflow:navigate', handleNav);
+  }, []);
 
   const renderContent = () => {
     switch (activeTab) {
       case "dashboard":
-        return <div><h1>📊 Dashboard</h1><p>Running pipelines will appear here.</p></div>;
+        return <DashboardPage />;
       case "downloader":
         return <DownloaderPage />;
       case "transcriber":

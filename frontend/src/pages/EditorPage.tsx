@@ -17,25 +17,6 @@ export function EditorPage() {
   const [currentTime, setCurrentTime] = useState(0);
 
   // Restore last session on mount
-  useEffect(() => {
-    const lastMedia = localStorage.getItem(STORAGE_KEY_LAST_MEDIA);
-    const lastSubs = localStorage.getItem(STORAGE_KEY_LAST_SUBS);
-    if (lastMedia) {
-      // Normalize Windows path: replace backslashes with forward slashes
-      const normalizedPath = lastMedia.replace(/\\/g, "/");
-      // Don't encodeURI the whole path as it may double-encode
-      const url = `file:///${normalizedPath}`;
-      setMediaUrl(url);
-    }
-    if (lastSubs) {
-      try {
-        setRegions(JSON.parse(lastSubs));
-      } catch (e) {
-        console.warn("Failed to parse saved subtitles", e);
-      }
-    }
-  }, []);
-
   // Try to find and load related subtitle file
   const tryLoadRelatedSubtitle = async (videoPath: string) => {
     // Replace video extension with .srt
@@ -57,6 +38,32 @@ export function EditorPage() {
       console.log("[Editor] No matching subtitle file found, using empty list.");
     }
   };
+
+  // Restore last session on mount
+  useEffect(() => {
+    const lastMedia = localStorage.getItem(STORAGE_KEY_LAST_MEDIA);
+    const lastSubs = localStorage.getItem(STORAGE_KEY_LAST_SUBS);
+    
+    if (lastMedia) {
+      // Normalize Windows path: replace backslashes with forward slashes
+      const normalizedPath = lastMedia.replace(/\\/g, "/");
+      const url = `file:///${normalizedPath}`;
+      setMediaUrl(url);
+      
+      // If we have media but NO saved session (or explicitly cleared), try to load from disk
+      if (!lastSubs) {
+          tryLoadRelatedSubtitle(lastMedia);
+      }
+    }
+    
+    if (lastSubs) {
+      try {
+        setRegions(JSON.parse(lastSubs));
+      } catch (e) {
+        console.warn("Failed to parse saved subtitles", e);
+      }
+    }
+  }, []);
 
   // Load file from Electron or Drag/Drop
   const handleOpenFile = async () => {

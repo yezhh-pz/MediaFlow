@@ -177,7 +177,10 @@ class DownloaderService:
                 current_time_line = ""
                 current_text = []
                 
-                timestamp_pattern = re.compile(r'(\d{2}:\d{2}:\d{2})[\.,](\d{3})\s-->\s(\d{2}:\d{2}:\d{2})[\.,](\d{3})')
+                # Pattern supports: 
+                # HH:MM:SS.mmm (00:01:02.000)
+                # MM:SS.mmm (01:02.000)
+                timestamp_pattern = re.compile(r'(?:(\d{2}):)?(\d{2}):(\d{2})[\.,](\d{3})\s-->\s(?:(\d{2}):)?(\d{2}):(\d{2})[\.,](\d{3})')
                 
                 for line in lines:
                     line = line.strip()
@@ -216,8 +219,10 @@ class DownloaderService:
                         if not current_time_line:
                             continue
                             
-                        # Skip if it's just an index number from original file
-                        if line.isdigit():
+                        # Logic Change: Only skip digits if they appear BEFORE the timestamp (header indices)
+                        # and NOT after the timestamp (actual content).
+                        # In VTT to SRT conversion, sequence numbers are handled by 'counter'.
+                        if line.isdigit() and not current_time_line:
                              continue
                         # Skip metadata lines or comments
                         if line.startswith('NOTE'):

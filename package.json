@@ -7,6 +7,9 @@
     "dev": "npm run electron:dev --prefix frontend",
     "build": "npm run build --prefix frontend",
     "preview": "npm run preview --prefix frontend",
-    "install:frontend": "npm install --prefix frontend"
+    "install:frontend": "npm install --prefix frontend",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "powershell -Command \"$env:PYTHONPATH = $PWD; pytest tests/ --verbose\"",
+    "test:frontend": "npm test --prefix frontend"
   }
 }

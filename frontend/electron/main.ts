@@ -9,18 +9,84 @@ const fs = require("fs");
 //   app.quit();
 // }
 
+// Preferences Management
+function getStorePath() {
+  return path.join(app.getPath("userData"), "user-preferences.json");
+}
+
+function loadLastOpenDir(): string | undefined {
+  try {
+    const p = getStorePath();
+    if (fs.existsSync(p)) {
+      const data = JSON.parse(fs.readFileSync(p, "utf-8"));
+      return data.lastOpenDir;
+    }
+  } catch (e) {
+    /* ignore */
+  }
+  return undefined;
+}
+
+function saveLastOpenDir(dirPath: string) {
+  try {
+    const p = getStorePath();
+    fs.writeFileSync(p, JSON.stringify({ lastOpenDir: dirPath }));
+  } catch (e) {
+    console.error("Save preferences failed", e);
+  }
+}
+
+// Initialize state
+let lastOpenDir: string | undefined = undefined;
+let isLoaded = false;
+
 // IPC: Open File Dialog
 ipcMain.handle("dialog:openFile", async () => {
+  // Lazy load state to ensure app is ready (app.getPath requires ready)
+  if (!isLoaded) {
+    lastOpenDir = loadLastOpenDir();
+    isLoaded = true;
+  }
+
+  // Attempt to resolve project temp directory (assumes dev structure)
+  // In production, might need adjustment logic
+  const projectRoot = path.resolve(__dirname, "../../");
+  const tempDir = path.join(projectRoot, "temp");
+
+  let startPath = lastOpenDir;
+  if (!startPath && fs.existsSync(tempDir)) {
+    startPath = tempDir;
+  }
+
   const { canceled, filePaths } = await dialog.showOpenDialog({
     properties: ["openFile"],
+    defaultPath: startPath,
     filters: [
       { name: "Media Files", extensions: ["mp4", "mkv", "avi", "mp3", "wav"] },
     ],
   });
-  if (canceled) {
+
+  if (canceled || filePaths.length === 0) {
     return null;
   } else {
-    return filePaths[0];
+    const filePath = filePaths[0];
+    lastOpenDir = path.dirname(filePath);
+    if (lastOpenDir) saveLastOpenDir(lastOpenDir);
+    try {
+      const stats = fs.statSync(filePath);
+      return {
+        path: filePath,
+        name: path.basename(filePath),
+        size: stats.size,
+      };
+    } catch (e) {
+      console.error("Failed to stat file:", e);
+      return {
+        path: filePath,
+        name: path.basename(filePath),
+        size: 0,
+      };
+    }
   }
 });
 
