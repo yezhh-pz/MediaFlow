@@ -39,11 +39,20 @@ class SettingsManager:
             try:
                 with open(self._file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
+                    # Decrypt keys before loading into model
+                    from src.utils.security import SecurityManager
+                    if "llm_providers" in data:
+                        for p in data["llm_providers"]:
+                            if "api_key" in p and p["api_key"]:
+                                # Try to decrypt; if fails, SecurityManager returns input (e.g. migration case)
+                                # Unless it looks like plaintext (migration scenario)
+                                decrypted = SecurityManager.decrypt(p["api_key"])
+                                p["api_key"] = decrypted
+                                
                     self._settings = UserSettings(**data)
                 logger.info(f"Loaded settings from {self._file_path}")
             except Exception as e:
                 logger.error(f"Failed to load settings: {e}")
-                # Fallback to defaults or .env migration
                 self._migrate_from_env()
         else:
             self._migrate_from_env()
@@ -61,7 +70,7 @@ class SettingsManager:
                 id="default_env",
                 name="Default (env)",
                 base_url=base_url,
-                api_key=api_key,
+                api_key=api_key, # Initial load is plaintext in memory
                 model=model,
                 is_active=True
             )
@@ -70,12 +79,23 @@ class SettingsManager:
     def save(self):
         self._file_path.parent.mkdir(parents=True, exist_ok=True)
         try:
+            # Encrypt sensitive data before saving
+            from src.utils.security import SecurityManager
+            
+            # Dump to dict first
+            if hasattr(self._settings, 'model_dump'):
+                data = self._settings.model_dump()
+            else:
+                data = self._settings.dict()
+            
+            # Encrypt API Keys in the dictionary copy
+            for p in data.get("llm_providers", []):
+                if p.get("api_key"):
+                    p["api_key"] = SecurityManager.encrypt(p["api_key"])
+            
             with open(self._file_path, "w", encoding="utf-8") as f:
-                f.write(self._settings.model_dump_json(indent=2)) # Pydantic V2
-        except AttributeError:
-             # Pydantic V1 fallback just in case
-             with open(self._file_path, "w", encoding="utf-8") as f:
-                f.write(self._settings.json(indent=2))
+                json.dump(data, f, indent=2, ensure_ascii=False)
+                
         except Exception as e:
             logger.error(f"Failed to save settings: {e}")
 
