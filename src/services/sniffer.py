@@ -4,6 +4,14 @@ from loguru import logger
 from typing import Optional, Dict
 from src.services.browser_service import browser_service
 
+# Configuration Constants
+MIN_VIDEO_URL_LENGTH = 50       # Minimum length for valid video URLs
+URL_LOG_TRUNCATE_LENGTH = 100   # Truncate URLs in logs for readability
+NETWORK_IDLE_TIMEOUT_MS = 10000 # Timeout for network idle state
+POST_URL_FOUND_MAX_WAIT = 10    # Max iterations to wait for title after URL found
+INTERACTION_INTERVAL = 4        # Every N iterations, try to trigger video playback
+
+
 class NetworkSniffer:
     _instance = None
     
@@ -11,6 +19,7 @@ class NetworkSniffer:
         if cls._instance is None:
             cls._instance = super(NetworkSniffer, cls).__new__(cls)
         return cls._instance
+
 
     async def get_page_info(self, url: str, custom_js: str = None, user_agent: str = None, timeout: int = 15) -> dict:
         """
@@ -67,13 +76,13 @@ class NetworkSniffer:
             # Kuaishou specific patterns (make generic later if needed)
             if '.mp4' in r_url or 'video_id=' in r_url or 'aweme/v1/play' in r_url:
                 if ".html" not in r_url and "blob:" not in r_url:
-                    if len(r_url) > 50:
+                    if len(r_url) > MIN_VIDEO_URL_LENGTH:
                         found_url = r_url
-                        logger.info(f"[Sniffer] Sniffed candidate: {r_url[:100]}...")
+                        logger.info(f"[Sniffer] Sniffed candidate: {r_url[:URL_LOG_TRUNCATE_LENGTH]}...")
                         await route.abort() # Save bandwidth
             elif '.m3u8' in r_url:
                 found_url = r_url
-                logger.info(f"[Sniffer] Sniffed candidate: {r_url[:100]}...")
+                logger.info(f"[Sniffer] Sniffed candidate: {r_url[:URL_LOG_TRUNCATE_LENGTH]}...")
                 await route.abort()
             else:
                  await route.continue_()
@@ -104,7 +113,7 @@ class NetworkSniffer:
                 # If we have URL but title is taking too long/failing, just give up on title
                 if found_url:
                     post_url_found_steps += 1
-                    if post_url_found_steps > 10: # Wait max ~5s after finding URL for debug dump
+                    if post_url_found_steps > POST_URL_FOUND_MAX_WAIT:
                         logger.info("[Sniffer] Title extraction timed out, proceeding with URL only.")
                         break
                 
@@ -123,7 +132,7 @@ class NetworkSniffer:
                     except Exception: pass
 
                 # Try to play to trigger request (Interaction is crucial for Desktop UA)
-                if step % 4 == 2:
+                if step % INTERACTION_INTERVAL == 2:
                      try:
                         # 1. Try HTML5 Video API (Muted autoplay is usually allowed)
                         await page.evaluate("""
