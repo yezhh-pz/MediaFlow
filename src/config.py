@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     FFMPEG_PATH: str = "ffmpeg"
     FFPROBE_PATH: str = "ffprobe"
 
+    # ASR Settings
+    ASR_MAX_WORKERS: int = 2
+
     # LLM Settings (Translator) - Must be set in .env file
     LLM_API_KEY: str = ""  # Required: Set VITE_LLM_API_KEY in .env
     LLM_BASE_URL: str = "https://api.openai.com/v1"

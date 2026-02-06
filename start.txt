@@ -1,13 +1,5 @@
 # 🚀 MediaFlow 启动指南
 
-## 后端服务
-
-```powershell
-python -m uvicorn src.main:app --host 127.0.0.1 --port 8000 --reload
-```
-
-## 前端应用
-
 ```powershell
 npm run dev
 ```

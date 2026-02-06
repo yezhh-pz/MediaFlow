@@ -8,6 +8,9 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
   },
+  optimizeDeps: {
+    include: ["react-window", "react-virtualized-auto-sizer"],
+  },
   test: {
     globals: true,
     environment: "jsdom",

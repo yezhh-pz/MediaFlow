@@ -17,4 +17,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getPathForFile: (file: File) =>
     // @ts-ignore
     require("electron").webUtils.getPathForFile(file),
+  writeFile: (filePath: string, content: string) =>
+    ipcRenderer.invoke("fs:writeFile", filePath, content),
 });

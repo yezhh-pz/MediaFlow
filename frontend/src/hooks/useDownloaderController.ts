@@ -1,56 +1,36 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { apiClient } from "../api/client";
 import type { AnalyzeResult } from "../api/client";
+import { useDownloaderStore } from "../stores/downloaderStore";
 
-export interface DownloaderState {
-  url: string;
-  loading: boolean;
-  analyzing: boolean;
-  result: any | null;
-  error: string | null;
-  playlistInfo: AnalyzeResult | null;
-  showPlaylistDialog: boolean;
-  selectedItems: number[];
-  downloadSubs: boolean;
-  resolution: string;
-}
+export function useDownloaderController() {
+  // Global Persistent State
+  const {
+    url,
+    resolution,
+    downloadSubs,
+    setUrl,
+    setResolution,
+    setDownloadSubs,
+    addToHistory,
+  } = useDownloaderStore();
 
-export function useDownloader() {
-  const [url, setUrl] = useState(
-    () => localStorage.getItem("downloader_url") || "",
-  );
+  // Ephemeral UI State
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<any>(null);
 
-  // Playlist detection state
+  // Playlist / Dialog State
   const [playlistInfo, setPlaylistInfo] = useState<AnalyzeResult | null>(null);
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
 
-  // Settings
-  const [downloadSubs, setDownloadSubs] = useState(() => {
-    return localStorage.getItem("downloader_subs") === "true";
-  });
-
-  const [resolution, setResolution] = useState(() => {
-    return localStorage.getItem("downloader_resolution") || "best";
-  });
-
-  // Persistence
-  useEffect(() => {
-    localStorage.setItem("downloader_url", url);
-  }, [url]);
-
-  useEffect(() => {
-    localStorage.setItem("downloader_subs", String(downloadSubs));
-    localStorage.setItem("downloader_resolution", resolution);
-  }, [downloadSubs, resolution]);
+  // Last successful analysis result (optional, for custom filename logic)
+  const [lastAnalysis, setLastAnalysis] = useState<AnalyzeResult | null>(null);
 
   // Debug Electron
   useEffect(() => {
-    // Ideally this should be in a global context or similar, but keeping it here for now as per original
     if (window.electronAPI) {
       // console.log("[Debug] Electron API available");
     }
@@ -65,7 +45,6 @@ export function useDownloader() {
       setLoading(true);
       setShowPlaylistDialog(false);
       setError(null);
-      setResult(null);
 
       let successCount = 0;
       for (let i = 0; i < urls.length; i++) {
@@ -75,11 +54,12 @@ export function useDownloader() {
           let finalExtraInfo: any = { ...extraInfo };
           let customFilename: string | undefined = undefined;
 
+          // Determine filename
           if (urls.length === 1) {
             if (finalExtraInfo.title) {
               customFilename = finalExtraInfo.title;
-            } else if (result?.title) {
-              customFilename = result.title;
+            } else if (lastAnalysis?.title) {
+              customFilename = lastAnalysis.title;
             }
           } else if (playlistInfo && playlistInfo.items) {
             const found = playlistInfo.items.find(
@@ -96,7 +76,8 @@ export function useDownloader() {
             directUrl = finalExtraInfo.direct_src;
           }
 
-          await apiClient.runPipeline({
+          // Execute Pipeline
+          const apiResult = await apiClient.runPipeline({
             pipeline_id: "downloader_tool",
             task_name: customFilename,
             steps: [
@@ -113,7 +94,33 @@ export function useDownloader() {
               },
             ],
           });
+
           successCount++;
+
+          // For single file, we can show the result card (though it might be pending)
+          // Ideally we wait for completion or simply show "Task Started"
+          // The old logic likely returned the result immediately or waited?
+          // runPipeline returns { task_id, status, message }
+          // The old useDownloader seemed to set result to something that has video_path?
+          // If runPipeline is async but returns immediately, we don't have video_path yet.
+          // BUT, maybe the simple download (non-pipeline) returned it?
+          // The new refactor uses runPipeline exclusively.
+          // So 'result' is just the Task Info now.
+          // However, DownloadResultCard probably expects video_path.
+          // We might need to fetch the task result after completion or just rely on TaskMonitor.
+          // Let's set the result to the Task Ref for now.
+          setResult(apiResult);
+
+          // Add to history
+          if (apiResult && apiResult.task_id) {
+            addToHistory({
+              id: apiResult.task_id,
+              url: currentUrl,
+              title: customFilename || "Unknown Video",
+              timestamp: Date.now(),
+              status: "pending",
+            });
+          }
         } catch (e: any) {
           console.error(e);
           setError(`Failed to queue ${urls[i]}: ${e.message}`);
@@ -121,18 +128,19 @@ export function useDownloader() {
       }
       setLoading(false);
     },
-    [downloadSubs, resolution, playlistInfo, result],
+    [downloadSubs, resolution, playlistInfo, lastAnalysis, addToHistory],
   );
 
   const handleAnalyzeAndDownload = async () => {
     if (!url) return;
     setAnalyzing(true);
     setError(null);
-    setResult(null);
     setPlaylistInfo(null);
+    setLastAnalysis(null);
 
     try {
       const analysis = await apiClient.analyzeUrl(url);
+      setLastAnalysis(analysis);
 
       if (
         analysis.type === "playlist" &&
@@ -157,6 +165,7 @@ export function useDownloader() {
     } catch (e: any) {
       const errorMessage = e.message || "Analysis failed";
 
+      // Cookie Logic
       if (errorMessage.includes("COOKIES_REQUIRED:")) {
         const match = errorMessage.match(/COOKIES_REQUIRED:([a-zA-Z0-9.-]+)/);
         const domain = match?.[1];
@@ -169,7 +178,9 @@ export function useDownloader() {
             if (cookies && cookies.length > 0) {
               await apiClient.saveCookies(domain, cookies);
               setError(null);
+              // Retry Logic
               const analysis = await apiClient.analyzeUrl(url);
+              setLastAnalysis(analysis);
 
               if (
                 analysis.type === "playlist" &&
@@ -233,27 +244,26 @@ export function useDownloader() {
   };
 
   return {
-    state: {
-      url,
-      loading,
-      analyzing,
-      result,
-      error,
-      playlistInfo,
-      showPlaylistDialog,
-      selectedItems,
-      downloadSubs,
-      resolution,
-    },
-    actions: {
-      setUrl,
-      setDownloadSubs,
-      setResolution,
-      setShowPlaylistDialog,
-      setSelectedItems,
-      analyzeAndDownload: handleAnalyzeAndDownload,
-      downloadPlaylist: handlePlaylistDownload,
-      toggleItemSelection,
-    },
+    // State
+    url,
+    loading,
+    analyzing,
+    error,
+    result,
+    playlistInfo,
+    showPlaylistDialog,
+    selectedItems,
+    downloadSubs,
+    resolution,
+
+    // Actions
+    setUrl,
+    setDownloadSubs,
+    setResolution,
+    setShowPlaylistDialog,
+    setSelectedItems,
+    analyzeAndDownload: handleAnalyzeAndDownload,
+    downloadPlaylist: handlePlaylistDownload,
+    toggleItemSelection,
   };
 }

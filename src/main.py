@@ -4,7 +4,7 @@ from loguru import logger
 import contextlib
 
 from src.config import settings
-from src.api.v1 import ingest, transcribe, pipeline, analyze, ws, tasks, cookies, translate
+from src.api.v1 import transcribe, pipeline, analyze, ws, tasks, cookies, translate, settings as settings_api, audio, glossary
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -34,7 +34,7 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-app.include_router(ingest.router, prefix="/api/v1")
+
 app.include_router(transcribe.router, prefix="/api/v1")
 app.include_router(translate.router, prefix="/api/v1")
 app.include_router(pipeline.router, prefix="/api/v1")
@@ -42,6 +42,9 @@ app.include_router(analyze.router, prefix="/api/v1")
 app.include_router(ws.router, prefix="/api/v1")
 app.include_router(tasks.router, prefix="/api/v1")
 app.include_router(cookies.router, prefix="/api/v1")
+app.include_router(settings_api.router, prefix="/api/v1")
+app.include_router(audio.router, prefix="/api/v1")
+app.include_router(glossary.router, prefix="/api/v1")
 
 # CORS (Allow Electron to connect)
 app.add_middleware(

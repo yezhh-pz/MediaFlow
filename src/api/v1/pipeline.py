@@ -16,7 +16,7 @@ async def run_pipeline(req: PipelineRequest, background_tasks: BackgroundTasks):
         # Create Task
         # Store params for potential resume
         logger.info(f"Pipeline Request: task_name={req.task_name}, steps={len(req.steps)}")
-        task_id = task_manager.create_task("pipeline", "Queued", request_params=req.dict(), task_name=req.task_name)
+        task_id = await task_manager.create_task("pipeline", "Queued", request_params=req.dict(), task_name=req.task_name)
         
         # Run in background
         background_tasks.add_task(pipeline_runner.run, req.steps, task_id)

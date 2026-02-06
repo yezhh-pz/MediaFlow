@@ -5,29 +5,30 @@ import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js";
 interface TimelineEditorProps {
   mediaUrl: string;
   initialRegions?: { start: number; end: number; content: string; id: string }[];
+  peaks?: any; 
+  onPeaksGenerated?: (peaks: any) => void;
 }
 
-export function TimelineEditor({ mediaUrl, initialRegions = [] }: TimelineEditorProps) {
+export function TimelineEditor({ mediaUrl, initialRegions = [], peaks, onPeaksGenerated }: TimelineEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const checkContainerRef = useRef<HTMLDivElement>(null); // To double check styles
+  const checkContainerRef = useRef<HTMLDivElement>(null); 
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const regionsPluginRef = useRef<RegionsPlugin | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [zoom, setZoom] = useState(100);
-
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
     
-    setIsReady(false); // Reset ready state on new media
+    setIsReady(false);
 
     // Initialize Regions Plugin
     const wsRegions = RegionsPlugin.create();
     regionsPluginRef.current = wsRegions;
 
     // Initialize WaveSurfer
-    const ws = WaveSurfer.create({
+    const options: any = {
       container: containerRef.current,
       waveColor: "#4F46E5",
       progressColor: "#818cf8",
@@ -37,15 +38,40 @@ export function TimelineEditor({ mediaUrl, initialRegions = [] }: TimelineEditor
       barGap: 1,
       barRadius: 2,
       height: 128,
-      minPxPerSec: 100, // Important for zoom
+      minPxPerSec: 100, 
       plugins: [wsRegions],
-    });
+    };
 
+    // If peaks are provided, use them to skip decoding
+    if (peaks) {
+        options.backend = 'MediaElement'; // Faster for large files if we have peaks? Or just default with peaks.
+        options.peaks = peaks;
+    }
+
+    const ws = WaveSurfer.create(options);
     wavesurferRef.current = ws;
     
-    // Wait for ready before allowing interaction/zoom
     ws.on("decode", () => {
         setIsReady(true);
+        // Export peaks if we didn't have them
+        if (!peaks && onPeaksGenerated) {
+            const exported = ws.exportPeaks(); 
+            // WaveSurfer v7 exportPeaks returns (available in some versions), or we map backend.
+            // Actually v7 has ws.exportPeaks() returning Array<Float32Array> or so.
+            // Let's check docs or safe check.
+            if (exported && exported.length > 0) {
+                 onPeaksGenerated(exported);
+            }
+        }
+    });
+
+    // Handle pre-decoded ready state (peaks provided)
+    ws.on("ready", () => {
+        setIsReady(true);
+        if (!peaks && onPeaksGenerated) {
+             const exported = ws.exportPeaks();
+             if (exported && exported.length > 0) onPeaksGenerated(exported);
+        }
     });
 
     ws.on("interaction", () => {
@@ -56,12 +82,8 @@ export function TimelineEditor({ mediaUrl, initialRegions = [] }: TimelineEditor
     ws.on("pause", () => setIsPlaying(false));
     ws.on("error", (e) => console.error("WaveSurfer Error:", e));
 
-    // ... (regions code same) ...
-    
-    // Add regions from props
-    // Clear existing first to avoid duplicates if re-rendering
+    // Regions setup
     wsRegions.clearRegions();
-    
     initialRegions.forEach((region) => {
         wsRegions.addRegion({
             start: region.start,
@@ -74,11 +96,11 @@ export function TimelineEditor({ mediaUrl, initialRegions = [] }: TimelineEditor
         });
     });
     
-    // Cleanup
     return () => {
       ws.destroy();
     };
-  }, [mediaUrl, initialRegions]); 
+  }, [mediaUrl]); // We don't want to re-init on initialRegions change, only on mediaUrl. specific update logic needed for regions? 
+  // For now standard EditorPage logic re-mounts on URL change.
 
   // Zoom Handler
   useEffect(() => {

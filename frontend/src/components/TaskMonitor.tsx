@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTaskContext } from '../context/TaskContext';
-import { CheckCircle, AlertCircle, Loader, Clock, Pause, Play, Trash2, FolderOpen } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader, Clock, Pause, Play, Trash2, FolderOpen, ChevronDown, ChevronUp } from 'lucide-react';
+import { TaskTraceView } from './TaskTraceView';
 
 const ProgressBar: React.FC<{ progress: number }> = ({ progress }) => (
   <div style={{ width: '100%', height: 6, background: '#333', borderRadius: 3, marginTop: 8, overflow: 'hidden' }}>
@@ -17,11 +18,21 @@ const ProgressBar: React.FC<{ progress: number }> = ({ progress }) => (
 
 export const TaskMonitor: React.FC<{ filterTypes?: string[] }> = ({ filterTypes }) => {
     const { tasks, cancelTask, connected } = useTaskContext();
+    const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
 
     const filteredTasks = React.useMemo(() => {
         if (!filterTypes || filterTypes.length === 0) return tasks;
         return tasks.filter(t => filterTypes.includes(t.type));
     }, [tasks, filterTypes]);
+
+    const toggleExpand = (taskId: string) => {
+        setExpandedTasks(prev => {
+            const next = new Set(prev);
+            if (next.has(taskId)) next.delete(taskId);
+            else next.add(taskId);
+            return next;
+        });
+    };
 
     if (filteredTasks.length === 0) {
         return null; // Or show empty state?
@@ -180,6 +191,17 @@ export const TaskMonitor: React.FC<{ filterTypes?: string[] }> = ({ filterTypes 
                                         <FolderOpen size={16} color="#3b82f6" />
                                     </button>
                                 )}
+
+                                {/* Expand/Collapse Trace */}
+                                {task.result?.execution_trace && (
+                                    <button 
+                                        onClick={() => toggleExpand(task.id)}
+                                        title={expandedTasks.has(task.id) ? "Hide Details" : "Show Details"}
+                                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}
+                                    >
+                                        {expandedTasks.has(task.id) ? <ChevronUp size={16} color="#aaa" /> : <ChevronDown size={16} color="#aaa" />}
+                                    </button>
+                                )}
                             </div>
                         </div>
                         
@@ -199,6 +221,13 @@ export const TaskMonitor: React.FC<{ filterTypes?: string[] }> = ({ filterTypes 
                         {task.error && (
                             <div style={{ fontSize: '0.85em', color: '#ef4444', marginTop: 5, paddingLeft: 28 }}>
                                 {task.error}
+                            </div>
+                        )}
+
+                        {/* Execution Trace View */}
+                        {expandedTasks.has(task.id) && task.result?.execution_trace && (
+                            <div style={{ paddingLeft: 28 }}>
+                                <TaskTraceView trace={task.result.execution_trace} />
                             </div>
                         )}
                     </div>

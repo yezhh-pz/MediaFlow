@@ -103,6 +103,20 @@ ipcMain.handle("fs:readFile", async (_event: any, filePath: string) => {
   }
 });
 
+// IPC: Write file content
+ipcMain.handle(
+  "fs:writeFile",
+  async (_event: any, filePath: string, content: string) => {
+    try {
+      fs.writeFileSync(filePath, content, "utf-8");
+      return true;
+    } catch (e) {
+      console.error("[IPC] writeFile error:", e);
+      return false;
+    }
+  },
+);
+
 // IPC: Show file in Explorer
 const { shell, session } = require("electron");
 ipcMain.handle(

@@ -25,6 +25,7 @@ class KuaishouPlatform(BasePlatform):
             logger.info(f"[Kuaishou] Step 2: Could not extract ID from URL")
 
         from src.services.browser_service import browser_service
+        from src.services.sniffer import sniffer
         import asyncio
         
         logger.info(f"[Kuaishou] Step 3: Prepare Dual-Strategy")
@@ -70,13 +71,13 @@ class KuaishouPlatform(BasePlatform):
             await browser_service.start()
             
             # Task 1: Sniff Video
-            # BrowserService will now handle stealth UA rotation automatically
-            task_video = browser_service.sniff(url, custom_js=None) 
+            # Sniffer will now handle stealth UA rotation automatically via browser_service.get_stealth_context
+            task_video = sniffer.sniff(url, custom_js=None) 
             
             # Task 2: Extract Title
             # We rely on the stealth context to bypass the block.
             # The JS script will try to extract from Apollo State or fallback to DOM.
-            task_title = browser_service.get_page_info(url, custom_js=js_script)
+            task_title = sniffer.get_page_info(url, custom_js=js_script)
             
             results = await asyncio.gather(task_video, task_title, return_exceptions=True)
             logger.info(f"[Kuaishou] Step 5: Tasks Completed")

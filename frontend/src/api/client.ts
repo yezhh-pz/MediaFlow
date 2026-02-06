@@ -133,4 +133,45 @@ export const apiClient = {
     }
     return await res.json();
   },
+
+  // Settings API
+  getSettings: async () => {
+    const res = await fetch(`${API_BASE}/settings/`);
+    if (!res.ok) throw new Error("Failed to fetch settings");
+    return await res.json();
+  },
+
+  updateSettings: async (settings: any) => {
+    const res = await fetch(`${API_BASE}/settings/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(settings),
+    });
+    if (!res.ok) throw new Error("Failed to update settings");
+    return await res.json();
+  },
+
+  setActiveProvider: async (providerId: string) => {
+    const res = await fetch(`${API_BASE}/settings/active-provider`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider_id: providerId }),
+    });
+    if (!res.ok) throw new Error("Failed to set active provider");
+    return await res.json();
+  },
+
+  detectSilence: async (payload: {
+    file_path: string;
+    threshold: string;
+    min_duration: number;
+  }) => {
+    const res = await fetch(`${API_BASE}/audio/detect-silence`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("Failed to detect silence");
+    return await res.json();
+  },
 };

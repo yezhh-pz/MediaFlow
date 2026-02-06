@@ -26,6 +26,9 @@ interface ElectronAPI {
 
   /** Get full path from File object (for Drag & Drop) */
   getPathForFile: (file: File) => string;
+
+  /** Write file content to local filesystem */
+  writeFile: (filePath: string, content: string) => Promise<boolean>;
 }
 
 interface Window {

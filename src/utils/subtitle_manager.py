@@ -1,9 +1,103 @@
 from pathlib import Path
 from typing import List
+import re
 from loguru import logger
 from src.models.schemas import SubtitleSegment
 
 class SubtitleManager:
+    @staticmethod
+    def process_vtt_file(vtt_path: Path) -> Path:
+        """
+        Process a VTT file downloaded by yt-dlp:
+        1. Clean garbage metadata (X-word-ms)
+        2. Convert to SRT
+        Returns the path to the generated SRT file.
+        """
+        try:
+            if not vtt_path.exists():
+                return None
+
+            logger.info(f"Processing subtitle file: {vtt_path.name}")
+            # Use utf-8-sig to handle BOM if present
+            content = vtt_path.read_text(encoding='utf-8-sig')
+            
+            # 1. Clean Metadata Tags
+            cleaned_content = re.sub(r'<X-word-ms[^>]*>.*?</X-word-ms>\s*', '', content, flags=re.DOTALL)
+            cleaned_content = re.sub(r'</?X-word-ms[^>]*>', '', cleaned_content)
+            
+            # 2. Convert to SRT
+            srt_lines = []
+            counter = 1
+            
+            # Normalize newlines
+            lines = cleaned_content.replace('\r\n', '\n').split('\n')
+            
+            current_time_line = ""
+            current_text = []
+            
+            # Pattern supports: HH:MM:SS.mmm or MM:SS.mmm
+            timestamp_pattern = re.compile(r'(?:(\d{2}):)?(\d{2}):(\d{2})[\.,](\d{3})\s-->\s(?:(\d{2}):)?(\d{2}):(\d{2})[\.,](\d{3})')
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    # Block finished?
+                    if current_time_line and current_text:
+                        srt_lines.append(str(counter))
+                        srt_lines.append(current_time_line)
+                        srt_lines.extend(current_text)
+                        srt_lines.append("") # Empty line after block
+                        counter += 1
+                        current_time_line = ""
+                        current_text = []
+                    continue
+                
+                # Check if timestamp line
+                match = timestamp_pattern.search(line)
+                if match:
+                    # Found a cue start
+                    if current_time_line and current_text:
+                        srt_lines.append(str(counter))
+                        srt_lines.append(current_time_line)
+                        srt_lines.extend(current_text)
+                        srt_lines.append("")
+                        counter += 1
+                    
+                    # Start new block, clear previous text
+                    current_text = []
+                    # Convert format: replace . with ,
+                    current_time_line = line.replace('.', ',')
+                else:
+                    # Content line
+                    if not current_time_line:
+                        continue
+                        
+                    # Skip header/metadata digits
+                    if line.isdigit() and not current_time_line:
+                            continue
+                    # Skip metadata lines or comments
+                    if line.startswith('NOTE'):
+                        continue
+                        
+                    current_text.append(line)
+
+            # Flush last block
+            if current_time_line and current_text:
+                srt_lines.append(str(counter))
+                srt_lines.append(current_time_line)
+                srt_lines.extend(current_text)
+                srt_lines.append("")
+
+            # Write SRT file
+            srt_path = vtt_path.with_suffix('.srt')
+            srt_path.write_text('\n'.join(srt_lines), encoding='utf-8')
+            logger.success(f"Converted to SRT: {srt_path.name}")
+            return srt_path
+            
+        except Exception as e:
+            logger.warning(f"Failed to process subtitles {vtt_path}: {e}")
+            return None
+
     @staticmethod
     def format_timestamp(seconds: float) -> str:
         """Convert seconds to SRT timestamp format (HH:MM:SS,mmm)."""

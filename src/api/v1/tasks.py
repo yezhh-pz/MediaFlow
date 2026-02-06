@@ -9,7 +9,7 @@ router = APIRouter(prefix="/tasks", tags=["Tasks"])
 @router.post("/cancel-all")
 async def cancel_all_tasks():
     """Cancel all active tasks."""
-    count = task_manager.cancel_all_tasks()
+    count = await task_manager.cancel_all_tasks()
     return {"message": f"Marked {count} tasks for cancellation", "count": count}
 
 @router.post("/{task_id}/resume")
@@ -45,7 +45,7 @@ async def resume_task(task_id: str, background_tasks: BackgroundTasks):
 @router.delete("/{task_id}")
 async def delete_task(task_id: str):
     """Delete a task (remove from list)."""
-    success = task_manager.delete_task(task_id)
+    success = await task_manager.delete_task(task_id)
     if not success:
          raise HTTPException(status_code=404, detail="Task not found")
     return {"message": "Task deleted", "task_id": task_id}
@@ -53,5 +53,5 @@ async def delete_task(task_id: str):
 @router.delete("/")
 async def delete_all_tasks():
     """Delete ALL tasks."""
-    count = task_manager.delete_all_tasks()
+    count = await task_manager.delete_all_tasks()
     return {"message": f"Deleted {count} tasks", "count": count}

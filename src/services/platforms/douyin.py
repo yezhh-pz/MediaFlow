@@ -36,13 +36,14 @@ class DouyinPlatform(BasePlatform):
 
         # 2. Use Playwright to sniff the real video URL
         from src.services.browser_service import browser_service
+        from src.services.sniffer import sniffer
         
         logger.info(f"[Douyin] Sniffing video URL via Playwright...")
         try:
             # Ensure browser is started (it checks internally)
             await browser_service.start()
             
-            sniff_result = await browser_service.sniff(url)
+            sniff_result = await sniffer.sniff(url)
             
             if not sniff_result or not sniff_result.get("url"):
                 raise Exception("Failed to sniff video URL from Douyin.")

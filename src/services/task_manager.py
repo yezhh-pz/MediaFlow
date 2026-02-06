@@ -49,8 +49,8 @@ class TaskManager:
         except Exception as e:
             logger.error(f"Failed to load tasks: {e}")
 
-    def save_tasks(self):
-        """Save tasks to JSON file."""
+    def _save_tasks_sync(self):
+        """Internal synchronous save."""
         # Ensure data directory exists
         self.data_file.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -59,6 +59,11 @@ class TaskManager:
                 json.dump(tasks_list, f, indent=2, ensure_ascii=False)
         except Exception as e:
             logger.error(f"Failed to save tasks: {e}")
+
+    async def save_tasks(self):
+        """Async save to file using executor to avoid blocking event loop."""
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self._save_tasks_sync)
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -94,9 +99,12 @@ class TaskManager:
                 "tasks": tasks_list
             })
         except Exception as e:
-            logger.error(f"Error sending snapshot: {e}")
+            logger.error(f"Error sending snapshot: {repr(e)}")
+            # If it's a disconnect, we might want to re-raise or handle cleanup
+            if "disconnect" in str(e).lower() or "closed" in str(e).lower():
+                 raise e
 
-    def create_task(self, task_type: str, initial_message: str = "Pending...", request_params: Dict = None, task_name: str = None) -> str:
+    async def create_task(self, task_type: str, initial_message: str = "Pending...", request_params: Dict = None, task_name: str = None) -> str:
         task_id = str(uuid.uuid4())[:8]
         
         # If no name provided, maybe use ID or type
@@ -112,7 +120,7 @@ class TaskManager:
             request_params=request_params
         )
         self.tasks[task_id] = task
-        self.save_tasks() # Persist
+        await self.save_tasks() # Persist async
         return task_id
 
     async def update_task(self, task_id: str, **kwargs):
@@ -125,7 +133,7 @@ class TaskManager:
             if hasattr(task, key):
                 setattr(task, key, value)
         
-        self.save_tasks() # Persist updates
+        await self.save_tasks() # Persist updates async
         
         # Broadcast update
         await self.broadcast({
@@ -133,25 +141,25 @@ class TaskManager:
             "task": task.dict()
         })
 
-    def cancel_task(self, task_id: str):
+    async def cancel_task(self, task_id: str):
         if task_id in self.tasks:
             self.tasks[task_id].cancelled = True
             self.tasks[task_id].status = "cancelled" # Update status immediately for UI
-            self.save_tasks()
+            await self.save_tasks()
             # Status update will be handled by the worker checking this flag
             logger.info(f"Task {task_id} marked for cancellation")
             # Force broadcast update
             asyncio.create_task(self.broadcast({"type": "update", "task": self.tasks[task_id].dict()}))
 
-    def delete_task(self, task_id: str) -> bool:
+    async def delete_task(self, task_id: str) -> bool:
         """Remove task from manager and persistence."""
         if task_id in self.tasks:
             # If running, try to cancel first (though caller should probably handle this)
             if self.tasks[task_id].status == "running":
-                self.cancel_task(task_id)
+                await self.cancel_task(task_id)
             
             del self.tasks[task_id]
-            self.save_tasks()
+            await self.save_tasks()
             
             # Broadcast deletion (using update with null or a new type)
             # Actually simpler to just send snapshot or specific delete event
@@ -163,7 +171,7 @@ class TaskManager:
             return True
         return False
 
-    def delete_all_tasks(self) -> int:
+    async def delete_all_tasks(self) -> int:
         """Delete all tasks from manager and persistence."""
         count = len(self.tasks)
         if count == 0:
@@ -171,7 +179,7 @@ class TaskManager:
             
         # Clear dictionary
         self.tasks.clear()
-        self.save_tasks()
+        await self.save_tasks()
         
         # Broadcast snapshot (empty list)
         asyncio.create_task(self.broadcast({
@@ -181,7 +189,7 @@ class TaskManager:
         logger.info(f"Deleted all {count} tasks")
         return count
 
-    def cancel_all_tasks(self):
+    async def cancel_all_tasks(self):
         """Cancel all pending or running tasks."""
         cancelled_count = 0
         for task_id, task in self.tasks.items():
@@ -189,7 +197,7 @@ class TaskManager:
                 task.cancelled = True
                 task.status = "cancelled"
                 cancelled_count += 1
-        self.save_tasks()
+        await self.save_tasks()
         logger.info(f"Marked {cancelled_count} tasks for cancellation")
         # Optimization: Broadcast snapshot instead of N updates
         asyncio.create_task(self.broadcast({

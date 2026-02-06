@@ -1,191 +1,328 @@
+
 import { useState, useRef, useEffect } from "react";
 import { WaveformPlayer } from "../components/editor/WaveformPlayer";
 import { SubtitleList } from "../components/editor/SubtitleList";
-import type { SubtitleSegment } from "../types/task";
-import { Clapperboard, Save, Scissors } from "lucide-react";
-import { parseSRT } from "../utils/subtitleParser";
+import { FindReplaceDialog } from "../components/dialogs/FindReplaceDialog";
+import { Clapperboard, Save, Scissors, Wand2 } from "lucide-react";
+import { ContextMenu, type ContextMenuItem } from "../components/ui/ContextMenu";
 
-// Storage Keys
-const STORAGE_KEY_LAST_MEDIA = "editor_last_media_path";
-const STORAGE_KEY_LAST_SUBS = "editor_last_subtitles";
+// Custom Hooks
+import { useEditorState } from "../hooks/editor/useEditorState";
+import { useEditorIO } from "../hooks/editor/useEditorIO";
+import { useEditorShortcuts } from "../hooks/editor/useEditorShortcuts";
 
 export function EditorPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
-  const [regions, setRegions] = useState<SubtitleSegment[]>([]);
-  const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
+  
+  // --- UI State ---
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [playingSegmentId, setPlayingSegmentId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
+  const [peaks, setPeaks] = useState<any>(null);
+  const [contextMenu, setContextMenu] = useState<{
+      position: { x: number; y: number };
+      items: ContextMenuItem[];
+      targetId?: string;
+  } | null>(null);
 
-  // Restore last session on mount
-  // Try to find and load related subtitle file
-  const tryLoadRelatedSubtitle = async (videoPath: string) => {
-    // Replace video extension with .srt
-    const srtPath = videoPath.replace(/\.[^.]+$/, '.srt');
-    try {
-      // Use Electron IPC to read local file
-      if (window.electronAPI?.readFile) {
-        const content = await window.electronAPI.readFile(srtPath);
-        if (content) {
-          const parsed = parseSRT(content);
-          if (parsed.length > 0) {
-            setRegions(parsed);
-            localStorage.setItem(STORAGE_KEY_LAST_SUBS, JSON.stringify(parsed));
-            console.log(`[Editor] Auto-loaded ${parsed.length} subtitles from ${srtPath}`);
-          }
-        }
-      }
-    } catch (e) {
-      console.log("[Editor] No matching subtitle file found, using empty list.");
-    }
-  };
+  // --- Domain Logic Hooks ---
+  
+  const {
+      regions,
+      setRegions, // Needed for IO
+      activeSegmentId,
+      selectedIds,
+      undo,   // implicitly used by shortcuts? No, passed explicitly
+      redo,
+      deleteSegments,
+      mergeSegments,
+      splitSegment,
+      updateRegion,
+      updateRegionText,
+      snapshot,
+      selectSegment
+  } = useEditorState([]);
 
-  // Restore last session on mount
+  const {
+      mediaUrl,
+      openFile,
+      savePeaks,
+      saveSubtitleFile,
+      detectSilence,
+      isReady // <--- Destructure
+  } = useEditorIO(setRegions, setPeaks);
+
+  // --- Persistence & Safety ---
+
+  // Ref for 'regions' current value for beforeunload without triggering effect re-run
+  const regionsRef = useRef(regions);
+  // const undoStackSizeRef = useRef(0); // REMOVED unused ref
+
   useEffect(() => {
-    const lastMedia = localStorage.getItem(STORAGE_KEY_LAST_MEDIA);
-    const lastSubs = localStorage.getItem(STORAGE_KEY_LAST_SUBS);
+    regionsRef.current = regions;
     
-    if (lastMedia) {
-      // Normalize Windows path: replace backslashes with forward slashes
-      const normalizedPath = lastMedia.replace(/\\/g, "/");
-      const url = `file:///${normalizedPath}`;
-      setMediaUrl(url);
-      
-      // If we have media but NO saved session (or explicitly cleared), try to load from disk
-      if (!lastSubs) {
-          tryLoadRelatedSubtitle(lastMedia);
-      }
+    // Auto-Save to LocalStorage
+    // ONLY if IO is ready (restoration complete)
+    if (isReady) {
+        localStorage.setItem("editor_last_subtitles", JSON.stringify(regions));
     }
-    
-    if (lastSubs) {
-      try {
-        setRegions(JSON.parse(lastSubs));
-      } catch (e) {
-        console.warn("Failed to parse saved subtitles", e);
-      }
-    }
+  }, [regions, isReady]);
+
+  useEffect(() => {
+      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+          if (regionsRef.current.length > 0) {
+              e.preventDefault();
+              e.returnValue = ''; // Chrome requires this
+          }
+      };
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
-  // Load file from Electron or Drag/Drop
-  const handleOpenFile = async () => {
-    if (window.electronAPI?.openFile) {
-        const path = await window.electronAPI.openFile();
-        if (path) {
-             const normalizedPath = path.replace(/\\/g, "/");
-             const url = `file:///${encodeURI(normalizedPath)}`;
-             setMediaUrl(url);
-             localStorage.setItem(STORAGE_KEY_LAST_MEDIA, path);
-             // Try to find matching subtitle
-             tryLoadRelatedSubtitle(path);
+  const handleSave = async () => {
+      try {
+          await saveSubtitleFile(regions);
+          alert("Saved successfully!");
+      } catch (e) {
+          alert("Failed to save file. See console.");
+      }
+  };
+
+  useEditorShortcuts({
+      videoRef,
+      selectedIds,
+      activeSegmentId,
+      undo,
+      redo,
+      deleteSegments,
+      splitSegment
+  });
+
+  // Global Save Shortcut (Ctrl+S)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            handleSave();
         }
-    } else {
-        // Fallback or Web Demo
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'video/*,audio/*';
-        input.onchange = (e) => {
-            const file = (e.target as HTMLInputElement).files?.[0];
-            if (file) {
-                setMediaUrl(URL.createObjectURL(file));
-                // Can't auto-discover subtitles in web mode
-            }
-        };
-        input.click();
-    }
-  };
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [regions, saveSubtitleFile]); // Need latest regions/fn
 
-  const handleRegionUpdate = (id: string, start: number, end: number) => {
-      setRegions(prev => prev.map(r => r.id === id ? { ...r, start, end } : r));
-  };
 
-  const handleRegionClick = (id: string) => {
-      setActiveSegmentId(id);
-  };
+  // --- View Handlers ---
 
-  const handleTextUpdate = (id: string, text: string) => {
-      setRegions(prev => prev.map(r => r.id === id ? { ...r, text } : r));
-  };
+  const handleRegionClick = (id: string, e?: MouseEvent | { ctrlKey: boolean, metaKey: boolean, shiftKey?: boolean, seek?: boolean }) => {
+      const isMulti = e?.ctrlKey || e?.metaKey || false;
+      const isRange = (e as any)?.shiftKey || false;
+      const shouldSeek = (e as any)?.seek || false;
 
-  const handleDelete = (id: string) => {
-      if(confirm("Delete this subtitle?")) {
-          setRegions(prev => prev.filter(r => r.id !== id));
+      selectSegment(id, isMulti, isRange);
+
+      if (shouldSeek && videoRef.current) {
+          const seg = regions.find(r => r.id === id);
+          if (seg) videoRef.current.currentTime = seg.start;
       }
   };
 
-  const handleMerge = (ids: string[]) => {
-      const selected = regions.filter(r => ids.includes(String(r.id)));
-      if (selected.length < 2) return;
-      
-      // Sort by start time
-      selected.sort((a, b) => a.start - b.start);
-      
-      const first = selected[0];
-      const last = selected[selected.length - 1];
-      const mergedText = selected.map(s => s.text).join(" ");
-      
-      const newSegment = {
-          ...first,
-          end: last.end,
-          text: mergedText
-      };
-      
-      setRegions(prev => {
-          // Remove all merged
-          const filtered = prev.filter(r => !ids.includes(String(r.id)));
-          return [...filtered, newSegment].sort((a, b) => a.start - b.start);
-      });
-  };
-
-  const handleSplit = () => {
-      if (!activeSegmentId || !videoRef.current) return;
-      
-      const time = videoRef.current.currentTime;
-      const segment = regions.find(r => r.id === activeSegmentId);
-      
-      if (!segment) return;
-      
-      if (time <= segment.start || time >= segment.end) {
-          alert("Split cursor must be inside the active segment.");
-          return;
-      }
-      
-      const part1 = { ...segment, end: time, id: segment.id + "_1" }; // temporary ID generation
-      const part2 = { ...segment, start: time, id: segment.id + "_2", text: "..." };
-      
-      setRegions(prev => {
-          const filtered = prev.filter(r => r.id !== activeSegmentId);
-          return [...filtered, part1, part2].sort((a, b) => a.start - b.start);
-      });
-  };
-  
-  // Update active segment based on playback time
   const handleTimeUpdate = () => {
       if(videoRef.current) {
           const t = videoRef.current.currentTime;
           setCurrentTime(t);
           
-          const current = regions.find(r => t >= r.start && t < r.end);
-          if (current && current.id !== activeSegmentId) {
-             // Optional: Auto-select? Might interfere with manual editing.
-             // setActiveSegmentId(String(current.id));
+          if (autoScroll) {
+              const playing = regions.find(r => t >= r.start && t < r.end);
+              if (playing && playing.id !== playingSegmentId) {
+                  setPlayingSegmentId(String(playing.id));
+              } else if (!playing && playingSegmentId) {
+                  setPlayingSegmentId(null);
+              }
           }
+      }
+  };
+
+  const [showFindReplace, setShowFindReplace] = useState(false);
+
+  // Global Shortcuts for Find & Replace (Ctrl+F)
+  useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+              e.preventDefault();
+              setShowFindReplace(prev => !prev);
+          }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleContextMenu = (e: any, id: string) => {
+      // Logic: If right click on unselected, select it.
+      if (!selectedIds.includes(id)) {
+          selectSegment(id, false, false);
+      }
+      
+      // Determine selection (current state might not update immediately if we just called selectSegment? 
+      // Actually setState is async. So we should use the 'id' processing logic here implies we trust the event target is now "active" contextually)
+      // Ideally we use a 'target' derived list.
+      const isSelected = selectedIds.includes(id);
+      const targetSelectedIds = isSelected ? selectedIds : [id];
+
+      // Check continuity
+      const indices = targetSelectedIds.map(sid => regions.findIndex(r => r.id === sid)).sort((a,b) => a-b);
+      let isContinuous = targetSelectedIds.length >= 2;
+      for (let i = 0; i < indices.length - 1; i++) {
+          if (indices[i+1] !== indices[i] + 1) isContinuous = false;
+      }
+
+      setContextMenu({
+          position: { x: e.clientX, y: e.clientY },
+          targetId: id,
+          items: (() => {
+              const menu: any[] = [
+                  {
+                      label: "播放此片段",
+                      onClick: () => {
+                          const seg = regions.find(r => r.id === id);
+                          if (seg && videoRef.current) {
+                              videoRef.current.currentTime = seg.start;
+                              videoRef.current.play();
+                          }
+                      }
+                  },
+                  { separator: true, label: "", onClick: () => {} }
+              ];
+
+              if (isContinuous) {
+                   menu.push({
+                      label: `合并 ${targetSelectedIds.length} 个片段`,
+                      disabled: false,
+                      onClick: () => mergeSegments(targetSelectedIds)
+                  });
+              }
+
+              menu.push({
+                  label: "分割",
+                  onClick: () => {
+                      if (videoRef.current) {
+                          splitSegment(videoRef.current.currentTime, id);
+                      }
+                  }
+              });
+
+              menu.push({ separator: true, label: "", onClick: () => {} });
+
+              menu.push({
+                  label: "删除",
+                  danger: true,
+                  onClick: () => {
+                      if(confirm(`确定删除这 ${targetSelectedIds.length} 项吗?`)) {
+                           deleteSegments(targetSelectedIds);
+                      }
+                  }
+              });
+
+              return menu;
+          })()
+      });
+  };
+
+  // Detail Editor Helper
+  const activeSegment = regions.find(r => r.id === activeSegmentId);
+  const displaySegment = activeSegment || (regions.length > 0 ? regions[0] : null);
+  const handleDetailUpdate = (field: 'start' | 'end' | 'text', value: string | number) => {
+      if (!displaySegment) return;
+      const id = String(displaySegment.id);
+
+      if (field === 'text') {
+          // Use the specific text updater which handles history
+          updateRegionText(id, value as string);
+      } else {
+          // For start/end manual edits, we want to save a snapshot first
+          // because updateRegion implies "drag/continuous update" and doesn't save history by itself
+          snapshot();
+          updateRegion(id, { [field]: value });
       }
   };
 
   return (
     <div className="h-full flex flex-col bg-slate-950 text-slate-100 overflow-hidden">
-        {/* Header */}
-        <header className="h-14 border-b border-slate-700 flex items-center justify-between px-4 bg-slate-900">
-            <div className="flex items-center gap-3">
+        {/* Header - Added pr-40 for Window Controls */}
+        <header className="h-14 border-b border-slate-700 flex items-center justify-between pl-4 pr-40 bg-slate-900 select-none" style={{ WebkitAppRegion: 'drag' } as any}>
+            <div className="flex items-center gap-3 no-drag" style={{ WebkitAppRegion: 'no-drag' } as any}>
                 <Clapperboard className="text-indigo-500" />
                 <h1 className="font-bold text-lg">Editor Workspace</h1>
                 <div className="h-4 w-[1px] bg-slate-700 mx-2"></div>
-                <button onClick={handleOpenFile} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 px-3 py-1.5 rounded transition-colors">
+                <button onClick={openFile} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 px-3 py-1.5 rounded transition-colors">
                     Open Media
                 </button>
             </div>
-            <div className="flex items-center gap-2">
-                 <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 rounded text-sm font-medium transition-colors">
-                     <Save size={16} /> Save Project
+            <div className="flex items-center gap-2 no-drag" style={{ WebkitAppRegion: 'no-drag' } as any}>
+                 <div className="flex items-center gap-2 mr-4">
+                    <input 
+                        type="checkbox" 
+                        id="autoScroll" 
+                        checked={autoScroll} 
+                        onChange={(e) => setAutoScroll(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label htmlFor="autoScroll" className="text-xs text-slate-400 select-none cursor-pointer">Auto-Scroll</label>
+                 </div>
+                 
+                 <button 
+                    onClick={async () => {
+                        if (!confirm("Start Smart Split (Voice Detection)?\n\nThis will OVERWRITE segments based on detected voice activity (non-silence).")) return;
+                        
+                        try {
+                            const silences = await detectSilence(); // returns [start, end][] of SILENCE
+                            const duration = videoRef.current?.duration || 0;
+                            
+                            if (silences && silences.length > 0 && duration > 0) {
+                                const speechSegments: {start: number, end: number}[] = [];
+                                let lastEnd = 0;
+
+                                // Invert silence to get speech
+                                // Silence: [0, 2], [5, 8] -> Speech: [2, 5], [8, end]
+                                // Logic: Speech is from (lastEnd) to (currentSilenceStart)
+                                
+                                silences.forEach(([silStart, silEnd]) => {
+                                    if (silStart > lastEnd + 0.1) { // Min speech duration 0.1s
+                                        speechSegments.push({ start: lastEnd, end: silStart });
+                                    }
+                                    lastEnd = Math.max(lastEnd, silEnd);
+                                });
+
+                                // Add final segment if there's audio after last silence
+                                if (lastEnd < duration - 0.1) {
+                                    speechSegments.push({ start: lastEnd, end: duration });
+                                }
+
+                                const newSegments = speechSegments.map((seg, idx) => ({
+                                    id: String(idx + 1),
+                                    start: seg.start,
+                                    end: seg.end,
+                                    text: "" 
+                                }));
+                                
+                                setRegions(newSegments);
+                            } else {
+                                alert("No silence/speech pattern detected.");
+                            }
+                        } catch (e) {
+                            alert("Failed to run detection. " + e);
+                        }
+                    }}
+                    className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 px-3 py-1.5 rounded text-sm transition-colors text-slate-300"
+                    title="Auto-split by Silence"
+                 >
+                     <Wand2 size={16} /> <span className="hidden sm:inline">Smart Split</span>
+                 </button>
+
+                 <button 
+                     onClick={handleSave}
+                     className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 rounded text-sm font-medium transition-colors"
+                 >
+                     <Save size={16} /> Save
                  </button>
             </div>
         </header>
@@ -194,14 +331,50 @@ export function EditorPage() {
         <div className="flex-1 flex min-h-0">
              {/* Left: Subtitle List */}
              <div className="w-1/3 min-w-[280px] max-w-[500px] border-r border-slate-700 flex flex-col">
-                 <SubtitleList 
-                    segments={regions}
-                    activeSegmentId={activeSegmentId}
-                    onSegmentClick={handleRegionClick}
-                    onSegmentUpdate={handleTextUpdate}
-                    onSegmentDelete={handleDelete}
-                    onSegmentMerge={handleMerge}
-                 />
+                 <div className="flex-1 min-h-0 bg-slate-800">
+                     <SubtitleList 
+                        segments={regions}
+                        activeSegmentId={activeSegmentId}
+                        playingSegmentId={playingSegmentId}
+                        autoScroll={autoScroll}
+                        selectedIds={selectedIds}
+                        onSegmentClick={(id, multi, shift) => handleRegionClick(id, { ctrlKey: multi, metaKey: false, shiftKey: shift, seek: false })}
+                        onSegmentDelete={(id) => deleteSegments([id])}
+                        onSegmentMerge={(ids) => mergeSegments(ids)}
+                        onSegmentDoubleClick={(id) => {
+                            const seg = regions.find(r => r.id === id);
+                            if (seg && videoRef.current) videoRef.current.currentTime = seg.start;
+                        }}
+                        onContextMenu={handleContextMenu}
+                        onAutoFix={(newSegments) => {
+                            setRegions(newSegments);
+                        }}
+                     />
+                 </div>
+                 
+                 {/* Simplified Detail Editor (Below List) */}
+                 {displaySegment && (
+                    <div className="h-32 bg-slate-850 p-2 flex flex-col gap-1 border-t border-slate-700 bg-slate-900 shadow-[inset_0_4px_6px_-1px_rgb(0_0_0_/_0.3)] z-10 transition-all">
+                         <div className="flex justify-between items-center text-xs text-slate-500 px-1">
+                             <span className="font-medium text-indigo-400">
+                                {activeSegmentId ? "Editing Selection" : "Editing Default (First)"}
+                             </span>
+                             <span className="font-mono opacity-50">
+                                {((displaySegment.end - displaySegment.start).toFixed(2))}s
+                             </span>
+                         </div>
+                         <textarea 
+                            value={displaySegment.text}
+                            onChange={(e) => handleDetailUpdate('text', e.target.value)}
+                            // Auto-select on focus if not selected?
+                            onFocus={() => {
+                                if (!activeSegmentId) selectSegment(String(displaySegment.id), false, false);
+                            }}
+                            className="flex-1 w-full bg-slate-800/50 border border-slate-700/50 rounded p-2 text-sm resize-none focus:outline-none focus:border-indigo-500/50 focus:bg-slate-800 transition-colors font-medium leading-relaxed"
+                            placeholder="Enter subtitle text..."
+                         />
+                    </div>
+                 )}
              </div>
              
              {/* Right: Video Preview */}
@@ -213,7 +386,7 @@ export function EditorPage() {
                                 ref={videoRef}
                                 src={mediaUrl}
                                 className="max-w-full max-h-full shadow-2xl"
-                                controls={false} // Custom controls via Waveform/Keys
+                                controls={false} 
                                 onTimeUpdate={handleTimeUpdate}
                                 onClick={() => {
                                     if(videoRef.current?.paused) videoRef.current.play();
@@ -234,7 +407,7 @@ export function EditorPage() {
                                  {new Date(currentTime * 1000).toISOString().substr(11, 8)}
                              </span>
                              <button
-                               onClick={handleSplit}
+                               onClick={() => videoRef.current && splitSegment(videoRef.current.currentTime)}
                                disabled={!activeSegmentId}
                                className="flex items-center gap-1 text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded disabled:opacity-50"
                                title="Split at Current Time"
@@ -259,11 +432,36 @@ export function EditorPage() {
                     mediaUrl={mediaUrl}
                     videoRef={videoRef}
                     regions={regions}
-                    onRegionUpdate={handleRegionUpdate}
+                    onRegionUpdate={(id, start, end) => updateRegion(id, { start, end })}
                     onRegionClick={handleRegionClick}
+                    onContextMenu={handleContextMenu}
+                    peaks={peaks}
+                    onPeaksGenerated={savePeaks}
+                    selectedIds={selectedIds}
+                    autoScroll={autoScroll}
                  />
              )}
         </div>
+        
+        {/* Context Menu */}
+        <ContextMenu 
+            items={contextMenu?.items || []}
+            position={contextMenu?.position || null}
+            onClose={() => setContextMenu(null)}
+        />
+        
+        {/* Find & Replace Dialog */}
+        <FindReplaceDialog 
+            isOpen={showFindReplace}
+            onClose={() => setShowFindReplace(false)}
+            regions={regions}
+            onSelectSegment={(id) => {
+                selectSegment(id, false, false);
+                // Also scroll/seek logic if needed? 
+                // Currently selectSegment updates activeId, SubtitleList autoScrolls to active.
+            }}
+            onUpdateSegment={(id, text) => updateRegion(id, { text })}
+        />
     </div>
   );
 }

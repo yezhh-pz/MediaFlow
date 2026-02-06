@@ -6,6 +6,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { DownloaderPage } from "./pages/DownloaderPage";
 import { TranscriberPage } from "./pages/TranscriberPage";
 import { TranslatorPage } from "./pages/TranslatorPage";
+import SettingsPage from "./pages/SettingsPage";
 
 import { TaskProvider } from "./context/TaskContext";
 
@@ -34,7 +35,7 @@ function App() {
       case "editor":
         return <EditorPage />;
       case "settings":
-        return <div><h1>⚙️ Settings</h1><p>Global configuration.</p></div>;
+        return <SettingsPage />;
       default:
         return <div>Select a tab</div>;
     }

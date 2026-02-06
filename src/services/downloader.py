@@ -2,9 +2,13 @@ import yt_dlp
 from pathlib import Path
 from loguru import logger
 import uuid
+import asyncio
 from src.config import settings
 from src.models.schemas import MediaAsset
+from src.services.platforms.factory import PlatformFactory
+from src.utils.subtitle_manager import SubtitleManager
 import re
+import time
 
 def clean_ansi(text: str) -> str:
     ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
@@ -14,13 +18,67 @@ class DownloaderService:
     def __init__(self):
         self.output_dir = settings.TEMP_DIR
 
-    def download(self, url: str, proxy: str = None, playlist_title: str = None, 
+    async def download(self, url: str, proxy: str = None, playlist_title: str = None, 
                 progress_callback=None, check_cancel_callback=None, download_subs: bool = False,
                 resolution: str = "best", task_id: str = None, cookie_file: str = None,
                 filename: str = None, local_source: str = None) -> MediaAsset:
         """
-        Synchronous download using yt-dlp. 
-        Should be run in a separate thread/executor to avoid blocking the event loop.
+        Async download entry point.
+        1. Analyzes URL via PlatformFactory (Strategy Pattern)
+        2. Offloads blocking download to thread executor
+        """
+        # 1. Strategy Analysis
+        handler = await PlatformFactory.get_handler(url)
+        final_url = url
+        final_title = filename
+        
+        if handler:
+            logger.info(f"Using platform handler: {handler.__class__.__name__}")
+            try:
+                # Analyze to get direct URL or metadata
+                # Note: For now we handle single video. Playlist logic requires more changes (returning list of assets)
+                # But existing code structure expects a single MediaAsset return.
+                # If analysis returns playlist, we might need a different flow. 
+                # For this refactor, we stick to single video optimization (Douyin direct link).
+                
+                result = await handler.analyze(url)
+                if result:
+                    if result.type == 'single':
+                        if result.direct_src:
+                            logger.info(f"Resolved direct URL: {result.direct_src[:50]}...")
+                            final_url = result.direct_src
+                        if result.title and not final_title:
+                            final_title = result.title
+            except Exception as e:
+                logger.error(f"Platform analysis failed, falling back to default: {e}")
+
+        # 2. Execution (Blocking)
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: self._perform_download_sync(
+                url=final_url,
+                start_url=url, # Pass original URL for reference/headers
+                proxy=proxy,
+                playlist_title=playlist_title,
+                progress_callback=progress_callback,
+                check_cancel_callback=check_cancel_callback,
+                download_subs=download_subs,
+                resolution=resolution,
+                task_id=task_id,
+                cookie_file=cookie_file,
+                filename=final_title, # passed as filename
+                local_source=local_source
+            )
+        )
+
+    def _perform_download_sync(self, url: str, start_url: str = None, proxy: str = None, playlist_title: str = None, 
+                progress_callback=None, check_cancel_callback=None, download_subs: bool = False,
+                resolution: str = "best", task_id: str = None, cookie_file: str = None,
+                filename: str = None, local_source: str = None) -> MediaAsset:
+        """
+        Synchronous download using yt-dlp.
+        Internal method, run in executor.
         """
         if playlist_title:
              # Sanitize playlist title to be safe for directory name
@@ -105,8 +163,9 @@ class DownloaderService:
             'nooverwrites': True,
             'continuedl': True,
             'ignoreerrors': True, # Skip failed videos in playlist
-            # Referer is also important for Douyin
-            'referer': 'https://www.douyin.com/',
+            # Referer is also important for Douyin (if using original URL)
+            # If using direct URL, sometimes no referer is better, or specific referer
+            'referer': 'https://www.douyin.com/' if 'douyin' in (start_url or url) else None,
         }
 
         logger.info(f"Starting download: {url}")
@@ -123,7 +182,7 @@ class DownloaderService:
             
             # Post-processing: Clean subtitles if requested
             if download_subs:
-                self._clean_subtitles(filename)
+                 SubtitleManager.process_vtt_file(Path(filename))
 
             logger.success(f"Download complete: {filename}")
             
@@ -135,119 +194,7 @@ class DownloaderService:
                 title=title
             )
 
-    def _clean_subtitles(self, video_path: str):
-        """
-        Process subtitles:
-        1. Clean garbage X/Twitter metadata
-        2. Convert VTT to SRT (add sequence numbers, fix timestamps)
-        """
-        try:
-            path_obj = Path(video_path)
-            
-            if path_obj.suffix.lower() == '.vtt':
-                candidates = [path_obj]
-            else:
-                directory = path_obj.parent
-                stem = path_obj.stem
-                candidates = [
-                    p for p in directory.glob("*.vtt") 
-                    if p.name.startswith(stem)
-                ]
 
-            for vtt_file in candidates:
-                if not vtt_file.exists():
-                     continue
-
-                logger.info(f"Processing subtitle file: {vtt_file.name}")
-                # Use utf-8-sig to handle BOM if present
-                content = vtt_file.read_text(encoding='utf-8-sig')
-                
-                # 1. Clean Metadata Tags
-                # Remove <X-word-ms> tags first
-                cleaned_content = re.sub(r'<X-word-ms[^>]*>.*?</X-word-ms>\s*', '', content, flags=re.DOTALL)
-                cleaned_content = re.sub(r'</?X-word-ms[^>]*>', '', cleaned_content)
-                
-                # 2. Convert to SRT
-                srt_lines = []
-                counter = 1
-                
-                # Normalize newlines
-                lines = cleaned_content.replace('\r\n', '\n').split('\n')
-                
-                current_time_line = ""
-                current_text = []
-                
-                # Pattern supports: 
-                # HH:MM:SS.mmm (00:01:02.000)
-                # MM:SS.mmm (01:02.000)
-                timestamp_pattern = re.compile(r'(?:(\d{2}):)?(\d{2}):(\d{2})[\.,](\d{3})\s-->\s(?:(\d{2}):)?(\d{2}):(\d{2})[\.,](\d{3})')
-                
-                for line in lines:
-                    line = line.strip()
-                    if not line:
-                        # Block finished?
-                        if current_time_line and current_text:
-                            # Write SRT block
-                            srt_lines.append(str(counter))
-                            srt_lines.append(current_time_line)
-                            srt_lines.extend(current_text)
-                            srt_lines.append("") # Empty line after block
-                            
-                            counter += 1
-                            current_time_line = ""
-                            current_text = []
-                        continue
-                    
-                    # Check if timestamp line
-                    match = timestamp_pattern.search(line)
-                    if match:
-                        # Found a cue start
-                         if current_time_line and current_text:
-                            srt_lines.append(str(counter))
-                            srt_lines.append(current_time_line)
-                            srt_lines.extend(current_text)
-                            srt_lines.append("")
-                            counter += 1
-                        
-                         # Start new block, clear previous text
-                         current_text = []
-                         # Convert format: replace . with ,
-                         current_time_line = line.replace('.', ',')
-                    else:
-                        # Content line
-                        # Critical Fix: Ignore text if we haven't seen a timestamp yet (skips WEBVTT header and metadata)
-                        if not current_time_line:
-                            continue
-                            
-                        # Logic Change: Only skip digits if they appear BEFORE the timestamp (header indices)
-                        # and NOT after the timestamp (actual content).
-                        # In VTT to SRT conversion, sequence numbers are handled by 'counter'.
-                        if line.isdigit() and not current_time_line:
-                             continue
-                        # Skip metadata lines or comments
-                        if line.startswith('NOTE'):
-                            continue
-                            
-                        current_text.append(line)
-
-                # Flush last block
-                if current_time_line and current_text:
-                    srt_lines.append(str(counter))
-                    srt_lines.append(current_time_line)
-                    srt_lines.extend(current_text)
-                    srt_lines.append("")
-
-                # Write SRT file
-                srt_path = vtt_file.with_suffix('.srt')
-                srt_path.write_text('\n'.join(srt_lines), encoding='utf-8')
-                logger.success(f"Converted to SRT: {srt_path.name}")
-                
-                # Optional: Overwrite VTT with cleaned content too, in case they prefer VTT?
-                # User asked for SRT conversion, so SRT is the priority.
-                # vtt_file.write_text(cleaned_content, encoding='utf-8') 
-
-        except Exception as e:
-            logger.warning(f"Failed to process subtitles: {e}")
 
     def _progress_hook(self, d, progress_callback, check_cancel_callback):
         # 1. Check for cancellation

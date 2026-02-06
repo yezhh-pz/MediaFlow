@@ -32,21 +32,27 @@ class IntelligentTranslationResponse(BaseModel):
 # --- Translator ---
 
 class LLMTranslator:
-    def __init__(self, model: str = None, base_url: str = None, api_key: str = None):
-        # Allow override or fallback to env vars (or settings if I imported them)
-        # Using env vars for simplicity as typical in this codebase's services
-        self.api_key = api_key or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
-        self.base_url = base_url or os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL")
-        self.model = model or os.getenv("LLM_MODEL") or "gpt-4o-mini"
+    def __init__(self):
+        # We no longer load static config here.
+        # Client is created lazily per request to allow runtime switching.
+        pass
+
+    def _get_client(self):
+        """
+        Dynamically construct the OpenAI client based on active settings.
+        """
+        from src.services.settings_manager import settings_manager
         
-        if not self.api_key:
-            logger.warning("LLM API Key not found. Translation service will fail.")
-            self.client = None
-        else:
-            self.client = instructor.patch(OpenAI(
-                api_key=self.api_key,
-                base_url=self.base_url
-            ))
+        provider = settings_manager.get_active_llm_provider()
+        if not provider:
+            logger.error("No active LLM provider found in settings.")
+            return None, None
+
+        client = instructor.patch(OpenAI(
+            api_key=provider.api_key,
+            base_url=provider.base_url
+        ))
+        return client, provider.model
 
     def _translate_batch_struct(
         self, 
@@ -58,13 +64,27 @@ class LLMTranslator:
         Internal batch translation using structured output.
         Returns a list of SubtitleSegment (the app's standard schema).
         """
-        if not self.client:
-            raise ValueError("LLM Client not initialized")
+        client, model_name = self._get_client()
+        
+        if not client:
+            raise ValueError("LLM Client not initialized (Check Settings)")
 
         # Convert to simple list for prompt
         input_text = "\n".join([f"[{s.id}] {s.start:.2f}-{s.end:.2f}: {s.text}" for s in segments])
         
+        # --- Glossary Injection ---
+        from src.services.translator.glossary_service import glossary_service
+        relevant_terms = glossary_service.get_relevant_terms(input_text)
+        
         system_prompt = f"You are a professional subtitle translator translating to {target_language}."
+        
+        if relevant_terms:
+            glossary_block = "\nGLOSSARY (Strictly follow these translations):\n"
+            for term in relevant_terms:
+                glossary_block += f"- {term.source} -> {term.target}\n"
+                if term.note:
+                    glossary_block += f"  (Note: {term.note})\n"
+            system_prompt += glossary_block
 
         if mode == "standard":
             system_prompt += """
@@ -75,8 +95,8 @@ Rules:
 3. Only translate the 'text' field.
 """
             try:
-                resp = self.client.chat.completions.create(
-                    model=self.model,
+                resp = client.chat.completions.create(
+                    model=model_name,
                     response_model=TranslationResponse,
                     messages=[
                         {"role": "system", "content": system_prompt},
@@ -112,8 +132,8 @@ Rules:
 5. For each segment, provide 'time_percentage' (0.0-1.0) representing portion of the total block duration.
 """
             try:
-                resp = self.client.chat.completions.create(
-                    model=self.model,
+                resp = client.chat.completions.create(
+                    model=model_name,
                     response_model=IntelligentTranslationResponse,
                     messages=[
                         {"role": "system", "content": system_prompt},

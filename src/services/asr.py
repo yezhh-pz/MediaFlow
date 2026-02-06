@@ -2,10 +2,12 @@ import os
 import shutil
 import asyncio
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from concurrent.futures import ThreadPoolExecutor
 
-from faster_whisper import WhisperModel
+if TYPE_CHECKING:
+    from faster_whisper import WhisperModel
+
 from loguru import logger
 
 from src.config import settings
@@ -22,7 +24,7 @@ class ASRService:
         """Singleton pattern ensuring only one service instance exists."""
         if cls._instance is None:
             cls._instance = super(ASRService, cls).__new__(cls)
-            cls._instance.executor = ThreadPoolExecutor(max_workers=2) # Limit concurrency
+            cls._instance.executor = ThreadPoolExecutor(max_workers=settings.ASR_MAX_WORKERS)
         return cls._instance
 
     def _load_model(self, model_name: str, device: str, progress_callback=None):
@@ -34,6 +36,9 @@ class ASRService:
             
         logger.info(f"Loading Whisper Model: {model_name} on {device}...")
         if progress_callback: progress_callback(0, f"Downloading model {model_name} (may take a while)...")
+        
+        # Lazy import to speed up app startup
+        from faster_whisper import WhisperModel
         
         try:
             compute_type = "float16" if device == "cuda" else "int8"
@@ -94,7 +99,7 @@ class ASRService:
 
     def transcribe(self, audio_path: str, model_name: str = "base", device: str = "cpu", language: str = None, task_id: str = None, initial_prompt: str = None, progress_callback=None) -> TranscribeResponse:
         """
-        Main entry point for transcription. Handled in a blocking manner here, called via executor from API.
+        Main entry point for transcription. Dispatches to specific strategies.
         """
         if not os.path.exists(audio_path):
             logger.error(f"Audio file not found: {audio_path}")
@@ -111,93 +116,136 @@ class ASRService:
         logger.info(f"Audio Duration: {duration:.2f}s")
         
         # 3. Strategy Decision
-        # If > 15 minutes, use Smart Splitting. Else direct transcribe.
         if duration > 900: 
-            logger.info("Long audio detected. Using VAD Smart Splitting strategy.")
-            if progress_callback: progress_callback(10, "Splitting audio...")
-
-            silence_intervals = AudioProcessor.detect_silence(audio_path)
-            split_points = AudioProcessor.calculate_split_points(duration, silence_intervals)
-            logger.info(f"Calculated {len(split_points)} split points: {[f'{p:.1f}s' for p in split_points]}")
-            
-            chunk_dir = settings.TEMP_DIR / f"chunks_{Path(audio_path).stem}"
-            chunk_dir.mkdir(parents=True, exist_ok=True)
-            
-            chunks = AudioProcessor.split_audio_physically(audio_path, split_points, chunk_dir)
-            logger.info(f"Split into {len(chunks)} physical chunks.")
-            if progress_callback: progress_callback(20, f"Split into {len(chunks)} chunks. Starting transcription...")
-
-            # Parallel Transcription
-            all_segments = []
-            total_chunks = len(chunks)
-            completed_chunks = 0
-            
-            def process_chunk(chunk_info):
-                c_path, c_offset = chunk_info
-                logger.info(f"Transcribing chunk starting at {c_offset:.1f}s...")
-                segs, _ = model.transcribe(
-                    c_path, 
-                    beam_size=5, 
-                    language=language, 
-                    vad_filter=True,
-                    initial_prompt=initial_prompt,
-                    word_timestamps=True 
-                )
-                
-                # Convert generator to list
-                segs_list = list(segs)
-                
-                # Refine relative to chunk
-                refined_local = SubtitleManager.refine_segments(segs_list, max_chars=50)
-                
-                # Apply Offset
-                chunk_segments = []
-                for s in refined_local:
-                    s.start += c_offset
-                    s.end += c_offset
-                    chunk_segments.append(s)
-                    
-                return chunk_segments
-
-            try:
-                futures = {self.executor.submit(process_chunk, chunk): chunk for chunk in chunks}
-                from concurrent.futures import as_completed
-                
-                for future in as_completed(futures):
-                    res = future.result()
-                    all_segments.extend(res)
-                    completed_chunks += 1
-                    
-                    if progress_callback:
-                        progress = 20 + int((completed_chunks / total_chunks) * 70)
-                        progress_callback(progress, f"Transcribed {completed_chunks}/{total_chunks} chunks")
-
-            except Exception as e:
-                logger.error(f"Chunk transcription failed: {e}")
-                raise e
-            finally:
-                if chunk_dir.exists():
-                    shutil.rmtree(chunk_dir, ignore_errors=True)
-            
-        else:
-            # Short audio, direct transcribe
-            logger.info(f"Short audio ({duration:.2f}s). Direct transcription.")
-            if progress_callback: progress_callback(20, "Starting transcription...")
-            
-            segments_gen, info = model.transcribe(
-                audio_path, 
-                beam_size=5, 
-                language=language,
-                vad_filter=True,
-                initial_prompt=initial_prompt,
-                word_timestamps=True,
-                condition_on_previous_text=False
+            all_segments = self._transcribe_smart_split(
+                audio_path, duration, model, language, initial_prompt, progress_callback
             )
-            
-            segments_list = list(segments_gen)
-            all_segments = SubtitleManager.refine_segments(segments_list, max_chars=50)
+        else:
+            all_segments = self._transcribe_direct(
+                audio_path, duration, model, language, initial_prompt, progress_callback
+            )
 
-        # 4. Final Processing (Global Merge)
+        # 4. Final Processing
+        if progress_callback: progress_callback(95, "Finalizing segments...")
+        
+        final_segments, full_text = self._merge_segments(all_segments)
+            
+        logger.success(f"Transcription complete. Total segments: {len(final_segments)}")
+        if progress_callback: progress_callback(100, "Completed")
+        
+        # 5. Save SRT file
+        srt_path = SubtitleManager.save_srt(final_segments, audio_path)
+        logger.success(f"SRT file saved to: {srt_path}")
+        
+        return TranscribeResponse(
+            task_id=task_id or "sync_task",
+            segments=final_segments,
+            text=full_text,
+            language=language or "auto",
+            srt_path=srt_path
+        )
+
+    def _transcribe_direct(self, audio_path: str, duration: float, model: "WhisperModel", language: str, initial_prompt: str, progress_callback) -> List[SubtitleSegment]:
+        """Handle short audio files directly."""
+        logger.info(f"Short audio ({duration:.2f}s). Direct transcription.")
+        if progress_callback: progress_callback(20, "Starting transcription...")
+        
+        segments_gen, info = model.transcribe(
+            audio_path, 
+            beam_size=5, 
+            language=language,
+            vad_filter=True,
+            initial_prompt=initial_prompt,
+            word_timestamps=True,
+            condition_on_previous_text=False
+        )
+        
+        segments_list = list(segments_gen)
+        return SubtitleManager.refine_segments(segments_list, max_chars=50)
+
+    def _transcribe_smart_split(self, audio_path: str, duration: float, model: "WhisperModel", language: str, initial_prompt: str, progress_callback) -> List[SubtitleSegment]:
+        """Handle long audio files by splitting them based on silence."""
+        logger.info("Long audio detected. Using VAD Smart Splitting strategy.")
+        if progress_callback: progress_callback(10, "Splitting audio...")
+
+        silence_intervals = AudioProcessor.detect_silence(audio_path)
+        split_points = AudioProcessor.calculate_split_points(duration, silence_intervals)
+        logger.info(f"Calculated {len(split_points)} split points: {[f'{p:.1f}s' for p in split_points]}")
+        
+        chunk_dir = settings.TEMP_DIR / f"chunks_{Path(audio_path).stem}"
+        chunk_dir.mkdir(parents=True, exist_ok=True)
+        
+        chunks = AudioProcessor.split_audio_physically(audio_path, split_points, chunk_dir)
+        logger.info(f"Split into {len(chunks)} physical chunks.")
+        
+        if progress_callback: progress_callback(20, f"Split into {len(chunks)} chunks. Starting transcription...")
+
+        all_segments = []
+        total_chunks = len(chunks)
+        completed_chunks = 0
+        
+        try:
+            # Create a localized function for pickle compatibility not required here since threads share memory
+            # But direct method reference is cleaner.
+            futures = {}
+            for chunk in chunks:
+                # We submit the _process_chunk method
+                future = self.executor.submit(
+                    self._process_chunk, 
+                    chunk, model, language, initial_prompt
+                )
+                futures[future] = chunk
+
+            from concurrent.futures import as_completed
+            
+            for future in as_completed(futures):
+                res = future.result()
+                all_segments.extend(res)
+                completed_chunks += 1
+                
+                if progress_callback:
+                    progress = 20 + int((completed_chunks / total_chunks) * 70)
+                    progress_callback(progress, f"Transcribed {completed_chunks}/{total_chunks} chunks")
+
+        except Exception as e:
+            logger.error(f"Chunk transcription failed: {e}")
+            raise e
+        finally:
+            if chunk_dir.exists():
+                shutil.rmtree(chunk_dir, ignore_errors=True)
+        
+        return all_segments
+
+    def _process_chunk(self, chunk_info, model: "WhisperModel", language: str, initial_prompt: str) -> List[SubtitleSegment]:
+        """Process a single audio chunk."""
+        c_path, c_offset = chunk_info
+        logger.info(f"Transcribing chunk starting at {c_offset:.1f}s...")
+        segs, _ = model.transcribe(
+            c_path, 
+            beam_size=5, 
+            language=language, 
+            vad_filter=True,
+            initial_prompt=initial_prompt,
+            word_timestamps=True 
+        )
+        
+        # Convert generator to list
+        segs_list = list(segs)
+        
+        # Refine relative to chunk
+        refined_local = SubtitleManager.refine_segments(segs_list, max_chars=50)
+        
+        # Apply Offset
+        chunk_segments = []
+        for s in refined_local:
+            s.start += c_offset
+            s.end += c_offset
+            chunk_segments.append(s)
+            
+        return chunk_segments
+
+    def _merge_segments(self, all_segments: List[SubtitleSegment]):
+        """Merge and sort segments from multiple chunks."""
         final_segments_list = []
         if all_segments:
              all_segments.sort(key=lambda x: x.start)
@@ -214,11 +262,8 @@ class ASRService:
                        prev.end = curr.end
                   else:
                        final_segments_list.append(curr)
-        else:
-             final_segments_list = []
-
-        if progress_callback: progress_callback(95, "Finalizing segments...")
         
+        # Re-index
         final_segments = []
         full_text_list = []
         for i, seg in enumerate(final_segments_list):
@@ -226,19 +271,6 @@ class ASRService:
             final_segments.append(seg)
             full_text_list.append(seg.text)
             
-        logger.success(f"Transcription complete. Total segments: {len(final_segments)}")
-        if progress_callback: progress_callback(100, "Completed")
-        
-        # 5. Save SRT file
-        srt_path = SubtitleManager.save_srt(final_segments, audio_path)
-        logger.success(f"SRT file saved to: {srt_path}")
-        
-        return TranscribeResponse(
-            task_id=task_id or "sync_task",
-            segments=final_segments,
-            text="\n".join(full_text_list),
-            language=language or "auto",
-            srt_path=srt_path
-        )
+        return final_segments, "\n".join(full_text_list)
 
 asr_service = ASRService()

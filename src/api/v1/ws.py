@@ -14,7 +14,7 @@ async def websocket_endpoint(websocket: WebSocket):
             if data.get("action") == "cancel":
                 task_id = data.get("task_id")
                 if task_id:
-                    task_manager.cancel_task(task_id)
+                    await task_manager.cancel_task(task_id)
     except WebSocketDisconnect:
         task_manager.disconnect(websocket)
     except Exception as e: # Handle other disconnect scenarios

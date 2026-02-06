@@ -68,7 +68,7 @@ async def translate_subtitles(req: TranslateRequest, background_tasks: Backgroun
     Submit a translation task.
     """
     try:
-        task_id = task_manager.create_task(
+        task_id = await task_manager.create_task(
             task_type="translate",
             initial_message="Queued",
             task_name=f"Translate to {req.target_language}",
