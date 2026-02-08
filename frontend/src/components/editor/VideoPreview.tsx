@@ -1,27 +1,33 @@
-
-import { Clapperboard, Scissors } from "lucide-react";
-import React, { RefObject } from "react";
+import { Clapperboard } from "lucide-react";
+import React, { type RefObject, useState, useCallback, useMemo } from "react";
 import type { SubtitleSegment } from "../../types/task";
 
 interface VideoPreviewProps {
     mediaUrl: string | null;
-    videoRef: RefObject<HTMLVideoElement | null>; // Relaxed type to match useRef(null) inference
-    currentTime: number;
+    videoRef: RefObject<HTMLVideoElement | null>;
     regions: SubtitleSegment[];
-    activeSegmentId: string | null;
-    handleTimeUpdate: () => void;
-    splitSegment: (time: number) => void;
 }
 
-export function VideoPreview({
+function VideoPreviewComponent({
     mediaUrl,
     videoRef,
-    currentTime,
     regions,
-    activeSegmentId,
-    handleTimeUpdate,
-    splitSegment
 }: VideoPreviewProps) {
+    // 内部管理时间状态，不传递给父组件
+    const [currentTime, setCurrentTime] = useState(0);
+
+    const handleTimeUpdate = useCallback(() => {
+        if (videoRef.current) {
+            setCurrentTime(videoRef.current.currentTime);
+        }
+    }, [videoRef]);
+
+    // 缓存当前字幕，避免每次渲染都遍历
+    const currentSubtitle = useMemo(() => 
+        regions.find(r => currentTime >= r.start && currentTime < r.end)?.text || "",
+        [regions, currentTime]
+    );
+
     return (
         <div className="flex-1 bg-black flex flex-col relative justify-center items-center">
             {mediaUrl ? (
@@ -31,34 +37,15 @@ export function VideoPreview({
                            ref={videoRef as any}
                            src={mediaUrl}
                            className="max-w-full max-h-full shadow-2xl"
-                           controls={false} 
+                           controls={true}
                            onTimeUpdate={handleTimeUpdate}
-                           onClick={() => {
-                               if(videoRef.current?.paused) videoRef.current.play();
-                               else videoRef.current?.pause();
-                           }}
                         />
                         {/* Overlay Subtitles */}
-                        <div className="absolute bottom-8 left-0 right-0 text-center pointer-events-none">
-                            <span className="bg-black/60 text-white px-2 py-1 rounded text-lg font-medium shadow-sm backdrop-blur-sm">
-                                {regions.find(r => currentTime >= r.start && currentTime < r.end)?.text || ""}
+                        <div className="absolute bottom-24 left-0 right-0 text-center pointer-events-none">
+                            <span className="bg-black/60 text-white px-3 py-1.5 rounded text-xl font-medium shadow-sm backdrop-blur-sm">
+                                {currentSubtitle}
                             </span>
                         </div>
-                    </div>
-                    
-                    {/* Mini Controls */}
-                    <div className="h-12 flex items-center justify-center gap-4 bg-slate-900 border-t border-slate-800 mt-2 rounded-lg">
-                        <span className="font-mono text-cyan-400 text-sm">
-                            {new Date(currentTime * 1000).toISOString().substr(11, 8)}
-                        </span>
-                        <button
-                          onClick={() => videoRef.current && splitSegment(videoRef.current.currentTime)}
-                          disabled={!activeSegmentId}
-                          className="flex items-center gap-1 text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded disabled:opacity-50"
-                          title="Split at Current Time"
-                        >
-                            <Scissors size={14} /> Split
-                        </button>
                     </div>
                 </div>
             ) : (
@@ -70,3 +57,5 @@ export function VideoPreview({
         </div>
     );
 }
+
+export const VideoPreview = React.memo(VideoPreviewComponent);

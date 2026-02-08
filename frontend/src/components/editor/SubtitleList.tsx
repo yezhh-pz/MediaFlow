@@ -6,7 +6,6 @@ import { validateSegment, fixOverlaps } from '../../utils/validation';
 interface SubtitleListProps {
     segments: SubtitleSegment[];
     activeSegmentId: string | null;
-    playingSegmentId: string | null;
     autoScroll: boolean;
     selectedIds: string[];
     onSegmentClick: (id: string, multi: boolean, shift?: boolean) => void;
@@ -17,11 +16,10 @@ interface SubtitleListProps {
     onAutoFix?: (newSegments: SubtitleSegment[]) => void;
 }
 
-export const SubtitleList: React.FC<SubtitleListProps> = (props) => {
+const SubtitleListComponent: React.FC<SubtitleListProps> = (props) => {
     const {
         segments,
         activeSegmentId,
-        playingSegmentId,
         autoScroll,
         selectedIds,
         onSegmentClick,
@@ -40,25 +38,14 @@ export const SubtitleList: React.FC<SubtitleListProps> = (props) => {
         itemRefs.current = {};
     }, [segments]);
 
-    // Auto-scroll logic: Native scrollIntoView
+    // 滚动逻辑：跟随 activeSegmentId
     useEffect(() => {
-        if (autoScroll && playingSegmentId) {
-            const el = itemRefs.current[playingSegmentId];
-            if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+        if (!autoScroll || !activeSegmentId) return;
+        const el = itemRefs.current[activeSegmentId];
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-    }, [playingSegmentId, autoScroll]);
-    
-    // Scroll to active (manual selection)
-    useEffect(() => {
-        if (activeSegmentId && !playingSegmentId) {
-            const el = itemRefs.current[activeSegmentId];
-            if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        }
-    }, [activeSegmentId, playingSegmentId]);
+    }, [activeSegmentId, autoScroll]);
 
     // Check continuity for merge
     const activeIndices = selectedIds.map(id => segments.findIndex(s => String(s.id) === id)).sort((a,b) => a-b);
@@ -128,7 +115,6 @@ export const SubtitleList: React.FC<SubtitleListProps> = (props) => {
                     segments.map((seg, index) => {
                         const idStr = String(seg.id);
                         const isActive = activeSegmentId === idStr;
-                        const isPlaying = playingSegmentId === idStr;
                         const isSelected = selectedIds.includes(idStr);
                         
                         // Validation
@@ -158,17 +144,16 @@ export const SubtitleList: React.FC<SubtitleListProps> = (props) => {
                                 ref={(el) => { itemRefs.current[idStr] = el; }}
                                 className={`
                                     group flex items-start border-b border-slate-800 transition-colors cursor-pointer border-l-4
-                                    ${isPlaying ? 'border-l-green-400 bg-slate-700/60' : 
-                                      isActive ? 'bg-indigo-900/40 border-l-indigo-500' : 'border-l-transparent hover:bg-slate-800/50'}
-                                    ${isSelected && !isActive && !isPlaying ? 'bg-indigo-900/60' : ''}
+                                    ${isActive ? 'bg-indigo-900/40 border-l-indigo-500' : 'border-l-transparent hover:bg-slate-800/50'}
+                                    ${isSelected && !isActive ? 'bg-indigo-900/60' : ''}
                                 `}
                                 onClick={(e) => onSegmentClick(idStr, e.ctrlKey || e.metaKey, e.shiftKey)}
                                 onDoubleClick={() => onSegmentDoubleClick(idStr)}
                                 onContextMenu={(e) => onContextMenu(e, idStr)}
                             >
                                 {/* Index */}
-                                <div className={`w-10 text-center py-2 font-mono text-xs select-none flex flex-col items-center gap-1 shrink-0 ${isPlaying ? 'text-green-400 font-bold' : 'text-slate-500'}`}>
-                                    {isPlaying ? "▶" : index + 1}
+                                <div className={`w-10 text-center py-2 font-mono text-xs select-none flex flex-col items-center gap-1 shrink-0 text-slate-500`}>
+                                    {index + 1}
                                     {(hasError || hasWarning) && (
                                         <div title={validationTooltip} className={issueColor}>
                                             <AlertCircle size={10} />
@@ -178,7 +163,7 @@ export const SubtitleList: React.FC<SubtitleListProps> = (props) => {
                                 
                                 {/* Text */}
                                 <div className="flex-1 py-1 px-2 select-none min-w-0">
-                                    <div className={`break-words leading-tight text-sm font-medium ${!seg.text ? 'text-slate-600 italic' : 'text-slate-200'} ${isPlaying ? 'text-white' : ''}`}>
+                                    <div className={`break-words leading-tight text-sm font-medium ${!seg.text ? 'text-slate-600 italic' : 'text-slate-200'}`}>
                                         {seg.text || "Empty segment"}
                                     </div>
                                 </div>
@@ -200,3 +185,6 @@ export const SubtitleList: React.FC<SubtitleListProps> = (props) => {
         </div>
     );
 };
+
+export const SubtitleList = React.memo(SubtitleListComponent);
+

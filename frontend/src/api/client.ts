@@ -161,4 +161,64 @@ export const apiClient = {
       body: JSON.stringify(payload),
     });
   },
+
+  previewPsd: (payload: { file_path: string }) => {
+    return request<any>("/editor/preview/psd-to-png", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  uploadPsd: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    // We can't use the generic request wrapper easily for FormData because it forces Content-Type: application/json
+    // So we assume the generic request wrapper handles it or we manually fetch.
+    // The generic `request` function in this file sets Content-Type: application/json if options.headers doesn't have it?
+    // Actually line 45 forces "Content-Type": "application/json". This is bad for FormData.
+    // We need to bypass the default header.
+
+    const url = `${API_BASE}/editor/preview/upload-psd`;
+    return fetch(url, {
+      method: "POST",
+      body: formData,
+    }).then(async (res) => {
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || res.statusText);
+      }
+      return res.json();
+    });
+  },
+
+  synthesizeVideo: (payload: {
+    video_path: string;
+    srt_path: string;
+    watermark_path: string | null;
+    output_path?: string | null;
+    options: any;
+  }) => {
+    return request<any>("/editor/synthesize", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  uploadWatermark: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const url = `${API_BASE}/editor/preview/upload-watermark`;
+    return fetch(url, { method: "POST", body: formData }).then(async (res) => {
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || res.statusText);
+      }
+      return res.json(); // Returns { png_path, data_url, width, height }
+    });
+  },
+
+  getLatestWatermark: () => {
+    return request<any>("/editor/preview/watermark/latest");
+  },
 };

@@ -90,6 +90,91 @@ ipcMain.handle("dialog:openFile", async () => {
   }
 });
 
+// IPC: Open Subtitle File Dialog
+ipcMain.handle("dialog:openSubtitleFile", async () => {
+  if (!isLoaded) {
+    lastOpenDir = loadLastOpenDir();
+    isLoaded = true;
+  }
+
+  const projectRoot = path.resolve(__dirname, "../../");
+  const tempDir = path.join(projectRoot, "temp");
+
+  let startPath = lastOpenDir;
+  if (!startPath && fs.existsSync(tempDir)) {
+    startPath = tempDir;
+  }
+
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    properties: ["openFile"],
+    defaultPath: startPath,
+    filters: [
+      {
+        name: "Subtitle Files",
+        extensions: ["srt", "vtt", "ass", "ssa", "txt"],
+      },
+    ],
+  });
+
+  if (canceled || filePaths.length === 0) {
+    return null;
+  } else {
+    const filePath = filePaths[0];
+    lastOpenDir = path.dirname(filePath);
+    if (lastOpenDir) saveLastOpenDir(lastOpenDir);
+    return {
+      path: filePath,
+      name: path.basename(filePath),
+    };
+  }
+});
+
+// IPC: Select Directory Dialog
+ipcMain.handle("dialog:selectDirectory", async () => {
+  if (!isLoaded) {
+    lastOpenDir = loadLastOpenDir();
+    isLoaded = true;
+  }
+
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    properties: ["openDirectory"],
+    defaultPath: lastOpenDir || undefined,
+  });
+
+  if (canceled || filePaths.length === 0) {
+    return null;
+  } else {
+    const dirPath = filePaths[0];
+    lastOpenDir = dirPath;
+    saveLastOpenDir(lastOpenDir);
+    return dirPath;
+  }
+});
+// IPC: Save File Dialog
+ipcMain.handle(
+  "dialog:saveFile",
+  async (
+    _event: any,
+    { defaultPath, filters }: { defaultPath?: string; filters?: any[] },
+  ) => {
+    console.log("[Main] dialog:saveFile called with:", {
+      defaultPath,
+      filters,
+    });
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      defaultPath,
+      filters,
+    });
+    console.log("[Main] dialog:saveFile result:", { canceled, filePath });
+
+    if (canceled) {
+      return null;
+    } else {
+      return filePath;
+    }
+  },
+);
+
 // IPC: Read file content (for subtitle loading)
 ipcMain.handle("fs:readFile", async (_event: any, filePath: string) => {
   try {
@@ -116,6 +201,20 @@ ipcMain.handle(
     }
   },
 );
+
+// IPC: Get file size
+ipcMain.handle("fs:getFileSize", async (_event: any, filePath: string) => {
+  try {
+    if (fs.existsSync(filePath)) {
+      const stats = fs.statSync(filePath);
+      return stats.size;
+    }
+    return 0;
+  } catch (e) {
+    console.error("[IPC] getFileSize error:", e);
+    return 0;
+  }
+});
 
 // IPC: Show file in Explorer
 const { shell, session } = require("electron");

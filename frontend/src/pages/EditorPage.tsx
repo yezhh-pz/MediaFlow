@@ -1,9 +1,11 @@
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { WaveformPlayer } from "../components/editor/WaveformPlayer";
 import { SubtitleList } from "../components/editor/SubtitleList";
 import { FindReplaceDialog } from "../components/dialogs/FindReplaceDialog";
+import { SynthesisDialog } from "../components/dialogs/SynthesisDialog";
 import { ContextMenu, type ContextMenuItem } from "../components/ui/ContextMenu";
+import { apiClient } from "../api/client";
 
 // Extracted Components
 import { EditorHeader } from "../components/editor/EditorHeader";
@@ -19,8 +21,7 @@ export function EditorPage() {
   
   // --- UI State ---
   const [autoScroll, setAutoScroll] = useState(true);
-  const [playingSegmentId, setPlayingSegmentId] = useState<string | null>(null);
-  const [currentTime, setCurrentTime] = useState(0);
+  // playingSegmentId 已移除 - 该功能导致性能问题
   const [peaks, setPeaks] = useState<any>(null);
   const [contextMenu, setContextMenu] = useState<{
       position: { x: number; y: number };
@@ -52,7 +53,8 @@ export function EditorPage() {
       savePeaks,
       saveSubtitleFile,
       detectSilence,
-      isReady // <--- Destructure
+      isReady,
+      currentFilePath // <--- Need this for synthesis real path
   } = useEditorIO(setRegions, setPeaks);
 
   // --- Persistence & Safety ---
@@ -136,6 +138,8 @@ export function EditorPage() {
 
   // State for Find & Replace dialog (moved before hook call)
   const [showFindReplace, setShowFindReplace] = useState(false);
+  const [showSynthesis, setShowSynthesis] = useState(false);
+
   useEditorShortcuts({
       videoRef,
       selectedIds,
@@ -151,7 +155,7 @@ export function EditorPage() {
 
   // --- View Handlers ---
 
-  const handleRegionClick = (id: string, e?: MouseEvent | { ctrlKey: boolean, metaKey: boolean, shiftKey?: boolean, seek?: boolean }) => {
+  const handleRegionClick = useCallback((id: string, e?: MouseEvent | { ctrlKey: boolean, metaKey: boolean, shiftKey?: boolean, seek?: boolean }) => {
       const isMulti = e?.ctrlKey || e?.metaKey || false;
       const isRange = (e as any)?.shiftKey || false;
       const shouldSeek = (e as any)?.seek || false;
@@ -159,29 +163,13 @@ export function EditorPage() {
       selectSegment(id, isMulti, isRange);
 
       if (shouldSeek && videoRef.current) {
-          const seg = regions.find(r => r.id === id);
+          const seg = regionsRef.current.find(r => r.id === id); // Use ref for latest regions without dependency
           if (seg) videoRef.current.currentTime = seg.start;
       }
-  };
-
-  const handleTimeUpdate = () => {
-      if(videoRef.current) {
-          const t = videoRef.current.currentTime;
-          setCurrentTime(t);
-          
-          if (autoScroll) {
-              const playing = regions.find(r => t >= r.start && t < r.end);
-              if (playing && playing.id !== playingSegmentId) {
-                  setPlayingSegmentId(String(playing.id));
-              } else if (!playing && playingSegmentId) {
-                  setPlayingSegmentId(null);
-              }
-          }
-      }
-  };
+  }, [selectSegment]); // regionsRef is stable
 
 
-  const handleContextMenu = (e: any, id: string) => {
+  const handleContextMenu = useCallback((e: any, id: string) => {
       // Logic: If right click on unselected, select it.
       if (!selectedIds.includes(id)) {
           selectSegment(id, false, false);
@@ -194,7 +182,7 @@ export function EditorPage() {
       const targetSelectedIds = isSelected ? selectedIds : [id];
 
       // Check continuity
-      const indices = targetSelectedIds.map(sid => regions.findIndex(r => r.id === sid)).sort((a,b) => a-b);
+      const indices = targetSelectedIds.map(sid => regionsRef.current.findIndex(r => r.id === sid)).sort((a,b) => a-b);
       let isContinuous = targetSelectedIds.length >= 2;
       for (let i = 0; i < indices.length - 1; i++) {
           if (indices[i+1] !== indices[i] + 1) isContinuous = false;
@@ -208,7 +196,7 @@ export function EditorPage() {
                   {
                       label: "播放此片段",
                       onClick: () => {
-                          const seg = regions.find(r => r.id === id);
+                          const seg = regionsRef.current.find(r => r.id === id);
                           if (seg && videoRef.current) {
                               videoRef.current.currentTime = seg.start;
                               videoRef.current.play();
@@ -250,7 +238,7 @@ export function EditorPage() {
               return menu;
           })()
       });
-  };
+  }, [selectedIds, selectSegment, mergeSegments, splitSegment, deleteSegments]); // regionsRef stable
 
   // Detail Editor Helper
   const activeSegment = regions.find(r => r.id === activeSegmentId);
@@ -269,6 +257,9 @@ export function EditorPage() {
           updateRegion(id, { [field]: value });
       }
   };
+  const handleRegionUpdateCallback = useCallback((id: string, start: number, end: number) => {
+      updateRegion(id, { start, end });
+  }, [updateRegion]);
 
   return (
     <div className="h-full flex flex-col bg-slate-950 text-slate-100 overflow-hidden">
@@ -279,6 +270,7 @@ export function EditorPage() {
             onOpenFile={openFile}
             onSave={handleSave}
             onSmartSplit={handleSmartSplit}
+            onSynthesize={() => setShowSynthesis(true)}
         />
 
         {/* Main Workspace: Top Split */}
@@ -289,7 +281,6 @@ export function EditorPage() {
                      <SubtitleList 
                         segments={regions}
                         activeSegmentId={activeSegmentId}
-                        playingSegmentId={playingSegmentId}
                         autoScroll={autoScroll}
                         selectedIds={selectedIds}
                         onSegmentClick={(id, multi, shift) => handleRegionClick(id, { ctrlKey: multi, metaKey: false, shiftKey: shift, seek: false })}
@@ -308,7 +299,7 @@ export function EditorPage() {
                  
                  {/* Simplified Detail Editor (Below List) */}
                  {displaySegment && (
-                    <div className="h-32 bg-slate-850 p-2 flex flex-col gap-1 border-t border-slate-700 bg-slate-900 shadow-[inset_0_4px_6px_-1px_rgb(0_0_0_/_0.3)] z-10 transition-all">
+                    <div className="h-24 bg-slate-850 p-2 flex flex-col gap-1 border-t border-slate-700 bg-slate-900 shadow-[inset_0_4px_6px_-1px_rgb(0_0_0_/_0.3)] z-10 transition-all">
                          <div className="flex justify-between items-center text-xs text-slate-500 px-1">
                              <span className="font-medium text-indigo-400">
                                 {activeSegmentId ? "Editing Selection" : "Editing Default (First)"}
@@ -335,28 +326,25 @@ export function EditorPage() {
              <VideoPreview 
                 mediaUrl={mediaUrl}
                 videoRef={videoRef}
-                currentTime={currentTime}
                 regions={regions}
-                activeSegmentId={activeSegmentId}
-                handleTimeUpdate={handleTimeUpdate}
-                splitSegment={(t) => splitSegment(t)}
              />
         </div>
         
         {/* Bottom: Waveform Timeline */}
-        <div className="h-48 min-h-[150px] bg-slate-900 border-t border-slate-700 relative z-20">
+        <div className="h-36 bg-slate-900 border-t border-slate-700 relative z-20">
              {mediaUrl && (
                  <WaveformPlayer 
                     mediaUrl={mediaUrl}
                     videoRef={videoRef}
                     regions={regions}
-                    onRegionUpdate={(id, start, end) => updateRegion(id, { start, end })}
+                    onRegionUpdate={handleRegionUpdateCallback}
                     onRegionClick={handleRegionClick}
                     onContextMenu={handleContextMenu}
                     peaks={peaks}
                     onPeaksGenerated={savePeaks}
                     selectedIds={selectedIds}
                     autoScroll={autoScroll}
+                    onInteractStart={snapshot}
                  />
              )}
         </div>
@@ -379,6 +367,42 @@ export function EditorPage() {
                 // Currently selectSegment updates activeId, SubtitleList autoScrolls to active.
             }}
             onUpdateSegment={(id, text) => updateRegion(id, { text })}
+        />
+        
+        {/* Synthesis Dialog */}
+        <SynthesisDialog 
+            isOpen={showSynthesis}
+            onClose={() => setShowSynthesis(false)}
+            regions={regions}
+            videoPath={currentFilePath || (mediaUrl ? mediaUrl.replace('file:///', '') : null)}
+            mediaUrl={mediaUrl}
+            onSynthesize={async (options, videoPath, watermarkPath) => {
+                // 1. Force Save FIRST to ensure SRT file on disk matches Editor content
+                try {
+                    console.log("[EditorPage] Saving subtitles before synthesis...");
+                    await saveSubtitleFile(regions); // This saves to video.srt
+                } catch (e) {
+                    console.error("[EditorPage] Failed to save subtitles before synthesis", e);
+                    if(!confirm("Failed to save subtitles. Synthesis will use the old file. Continue?")) {
+                        return;
+                    }
+                }
+
+                // 2. Trigger Synthesis
+                // We assume saveSubtitleFile saved to videoPath.replace(ext, .srt)
+                // So we derive srtPath same way
+                const srtPath = videoPath.replace(/\.[^.]+$/, '.srt');
+                const { output_path, ...restOptions } = options;
+                console.log("[EditorPage] Starting synthesis with:", { videoPath, srtPath, output_path });
+                
+                await apiClient.synthesizeVideo({
+                    video_path: videoPath,
+                    srt_path: srtPath,
+                    watermark_path: watermarkPath,
+                    output_path: output_path,
+                    options: restOptions
+                });
+            }}
         />
     </div>
   );

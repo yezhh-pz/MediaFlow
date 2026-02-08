@@ -15,6 +15,22 @@ def _get_pipeline_runner():
     return container.get(Services.PIPELINE)
 
 
+@router.get("/", response_model=list[dict])
+async def list_tasks():
+    """Get all tasks."""
+    tm = _get_task_manager()
+    return [task.dict() for task in tm.tasks.values()]
+
+
+@router.get("/{task_id}", response_model=dict)
+async def get_task(task_id: str):
+    """Get task status."""
+    task = _get_task_manager().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task.dict()
+
+
 @router.post("/cancel-all")
 async def cancel_all_tasks():
     """Cancel all active tasks."""
@@ -43,6 +59,11 @@ async def resume_task(task_id: str, background_tasks: BackgroundTasks):
         if task.type == "transcribe":
             req = TranscribeRequest(**task.request_params)
             background_tasks.add_task(run_transcription_task, task_id, req)
+        elif task.type == "synthesis":
+            # Late import to avoid potential circular imports
+            from src.api.v1.editor import run_synthesis_task, SynthesisRequest
+            req = SynthesisRequest(**task.request_params)
+            background_tasks.add_task(run_synthesis_task, task_id, req)
         else:
             # Default to pipeline/download
             req = PipelineRequest(**task.request_params)

@@ -42,6 +42,9 @@ class DownloaderService:
         1. Analyzes URL via PlatformFactory (Strategy Pattern)
         2. Offloads blocking download to thread executor
         """
+        # Normalize URL to string (handles Pydantic HttpUrl objects)
+        url = str(url)
+        
         # 1. Strategy Analysis
         handler = await PlatformFactory.get_handler(url)
         final_url = url
@@ -191,7 +194,7 @@ class DownloaderService:
             'ignoreerrors': True, # Skip failed videos in playlist
             # Referer is also important for Douyin (if using original URL)
             # If using direct URL, sometimes no referer is better, or specific referer
-            'referer': 'https://www.douyin.com/' if 'douyin' in (start_url or url) else None,
+            'referer': 'https://www.douyin.com/' if 'douyin' in str(start_url or url) else None,
         }
 
         logger.info(f"Starting download: {url}")
@@ -207,8 +210,54 @@ class DownloaderService:
             title = info.get('title')
             
             # Post-processing: Clean subtitles if requested
+            subtitle_path = None
             if download_subs:
-                 SubtitleManager.process_vtt_file(Path(filename))
+                video_path = Path(filename)
+                
+                # 1. Search for VTT files to convert (yt-dlp usually saves as .en.vtt or .vtt)
+                # We prioritize language-specific VTTs
+                vtt_processed = False
+                for ext in ['.en.vtt', '.zh.vtt', '.vtt']:
+                    vtt_candidate = video_path.with_suffix(ext)
+                    if vtt_candidate.exists():
+                        logger.info(f"Found VTT file: {vtt_candidate}")
+                        # Convert to SRT
+                        srt_out = SubtitleManager.process_vtt_file(vtt_candidate)
+                        if srt_out and srt_out.exists():
+                            # RENAME to standard .srt (Video.srt) to ensure Editor/Player compatibility
+                            standard_srt_path = video_path.with_suffix('.srt')
+                            
+                            # If it's not already named correctly, rename it
+                            if srt_out != standard_srt_path:
+                                try:
+                                    if standard_srt_path.exists():
+                                        standard_srt_path.unlink() # Overwrite existing
+                                    srt_out.rename(standard_srt_path)
+                                    subtitle_path = str(standard_srt_path)
+                                    logger.info(f"Renamed subtitle to standard format: {subtitle_path}")
+                                except Exception as e:
+                                    logger.warning(f"Failed to rename subtitle: {e}")
+                                    subtitle_path = str(srt_out) # Fallback
+                            else:
+                                subtitle_path = str(srt_out)
+                                
+                            vtt_processed = True
+                            logger.info(f"Converted and selected SRT: {subtitle_path}")
+                        break
+                
+                # 2. If no VTT converted, check for existing SRT (maybe downloaded directly or failed conversion)
+                if not subtitle_path:
+                    # Check for standard .srt first
+                    if video_path.with_suffix('.srt').exists():
+                        subtitle_path = str(video_path.with_suffix('.srt'))
+                        logger.info(f"Detected existing standard SRT: {subtitle_path}")
+                    else:
+                        for ext in ['.en.srt', '.zh.srt', '.srt']:
+                            srt_candidate = video_path.with_suffix(ext)
+                            if srt_candidate.exists():
+                                subtitle_path = str(srt_candidate)
+                                logger.info(f"Detected existing SRT: {subtitle_path}")
+                                break
 
             logger.success(f"Download complete: {filename}")
             
@@ -217,7 +266,8 @@ class DownloaderService:
                 filename=Path(filename).name,
                 path=filename,
                 duration=duration,
-                title=title
+                title=title,
+                subtitle_path=subtitle_path
             )
 
 

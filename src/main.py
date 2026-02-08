@@ -66,10 +66,13 @@ app.include_router(pipeline.router, prefix="/api/v1")
 app.include_router(analyze.router, prefix="/api/v1")
 app.include_router(ws.router, prefix="/api/v1")
 app.include_router(tasks.router, prefix="/api/v1")
-app.include_router(cookies.router, prefix="/api/v1")
 app.include_router(settings_api.router, prefix="/api/v1")
 app.include_router(audio.router, prefix="/api/v1")
 app.include_router(glossary.router, prefix="/api/v1")
+
+# Late import to avoid circular dependency if any
+from src.api.v1 import editor
+app.include_router(editor.router, prefix="/api/v1")
 
 # CORS (Restricted to local Electron and Vite dev server)
 app.add_middleware(

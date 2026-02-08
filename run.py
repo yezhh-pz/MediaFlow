@@ -13,7 +13,7 @@ def main():
     uvicorn.run(
         "src.main:app", 
         host=settings.HOST, 
-        port=8001, 
+        port=8000, 
         reload=False # Disable reload to ensure Policy sticks in the main process
     )
 

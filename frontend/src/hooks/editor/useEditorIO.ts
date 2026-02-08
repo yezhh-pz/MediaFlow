@@ -16,22 +16,40 @@ export function useEditorIO(
 
   // --- Private Helpers ---
 
+  // Enhanced to try Priority Suffixes first: _CN, _EN, etc., then base .srt
   const tryLoadRelatedSubtitle = async (videoPath: string) => {
-    const srtPath = videoPath.replace(/\.[^.]+$/, ".srt");
-    try {
-      if (window.electronAPI?.readFile) {
-        const content = await window.electronAPI.readFile(srtPath);
-        if (content) {
-          const parsed = parseSRT(content);
-          if (parsed.length > 0) {
-            setRegions(parsed);
-            localStorage.setItem(STORAGE_KEY_LAST_SUBS, JSON.stringify(parsed));
+    // Priority order for auto-loading subtitles
+    const priorities = ["_CN", "_EN", "_JP", "_ES", "_FR", "_DE", "_RU", ""]; // "" = base .srt
+
+    // Strip extension to get base name (e.g., "video.mp4" -> "video")
+    const basePath = videoPath.replace(/\.[^.]+$/, "");
+
+    for (const suffix of priorities) {
+      const srtPath = `${basePath}${suffix}.srt`;
+      try {
+        if (window.electronAPI?.readFile) {
+          const content = await window.electronAPI.readFile(srtPath);
+          if (content) {
+            const parsed = parseSRT(content);
+            if (parsed.length > 0) {
+              console.log(
+                `[EditorIO] Loaded priority subtitle (${suffix || "base"}):`,
+                srtPath,
+              );
+              setRegions(parsed);
+              localStorage.setItem(
+                STORAGE_KEY_LAST_SUBS,
+                JSON.stringify(parsed),
+              );
+              return; // Found and loaded, stop searching
+            }
           }
         }
+      } catch (e) {
+        // Ignore missing files
       }
-    } catch (e) {
-      console.log("[EditorIO] No matching subtitle file found.");
     }
+    console.log("[EditorIO] No matching subtitle file found.");
   };
 
   const tryLoadPeaks = async (videoPath: string) => {
@@ -122,6 +140,69 @@ export function useEditorIO(
 
   useEffect(() => {
     const restoreSession = async () => {
+      // 1. Check for pending navigation file (from Translator/TaskMonitor)
+      const pendingFile = sessionStorage.getItem("mediaflow:pending_file");
+      if (pendingFile) {
+        try {
+          const data = JSON.parse(pendingFile);
+          // Only process if it's meant for editor (or generic from TaskMonitor which might not have target yet,
+          // but we should probably process it if it has video_path)
+          // TaskMonitor sends { video_path, subtitle_path } without target sometimes?
+          // We should probably check if it HAS video_path.
+
+          const isValidTarget = !data.target || data.target === "editor";
+
+          if (isValidTarget && data.video_path) {
+            console.log("[EditorIO] Found pending navigation:", data);
+
+            // Load it
+            const normalizedPath = data.video_path.replace(/\\/g, "/");
+            setMediaUrl(`file:///${normalizedPath}`);
+            setCurrentFilePath(data.video_path);
+
+            // Store as last media immediately
+            localStorage.setItem(STORAGE_KEY_LAST_MEDIA, data.video_path);
+
+            // Load peaks
+            await tryLoadPeaks(data.video_path);
+
+            // Load specific subtitle if provided, otherwise try auto-load
+            if (data.subtitle_path) {
+              try {
+                if (window.electronAPI?.readFile) {
+                  const content = await window.electronAPI.readFile(
+                    data.subtitle_path,
+                  );
+                  if (content) {
+                    const parsed = parseSRT(content);
+                    setRegions(parsed);
+                    localStorage.setItem(
+                      STORAGE_KEY_LAST_SUBS,
+                      JSON.stringify(parsed),
+                    );
+                    console.log(
+                      "[EditorIO] Loaded pending subtitle:",
+                      data.subtitle_path,
+                    );
+                  }
+                }
+              } catch (e) {
+                console.error("[EditorIO] Failed to load pending subtitle", e);
+              }
+            } else {
+              await tryLoadRelatedSubtitle(data.video_path);
+            }
+
+            sessionStorage.removeItem("mediaflow:pending_file");
+            setIsReady(true);
+            return; // Skip local storage restoration
+          }
+        } catch (e) {
+          console.error("Failed to parse pending file for editor", e);
+        }
+      }
+
+      // 2. Fallback to LocalStorage (Last Session)
       const lastMedia = localStorage.getItem(STORAGE_KEY_LAST_MEDIA);
       const lastSubs = localStorage.getItem(STORAGE_KEY_LAST_SUBS);
 

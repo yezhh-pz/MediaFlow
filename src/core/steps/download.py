@@ -58,6 +58,9 @@ class DownloadStep(PipelineStep):
         ctx.set("video_path", asset.path)
         ctx.set("media_filename", asset.filename)
         ctx.set("title", asset.title)
+        
+        if asset.subtitle_path:
+            ctx.set("subtitle_path", asset.subtitle_path)
         logger.success(f"Step Download finished. Path: {asset.path}")
 
 

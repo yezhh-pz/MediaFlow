@@ -38,3 +38,26 @@
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* WaveSurfer 横向滚动条样式 - 使用 ::part() 穿透 Shadow DOM */
+.wavesurfer-wrapper::part(scroll)::-webkit-scrollbar,
+.wavesurfer-wrapper *::part(scroll)::-webkit-scrollbar {
+  height: 6px;
+}
+
+.wavesurfer-wrapper::part(scroll)::-webkit-scrollbar-track,
+.wavesurfer-wrapper *::part(scroll)::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.5); /* slate-800 半透明 */
+  border-radius: 3px;
+}
+
+.wavesurfer-wrapper::part(scroll)::-webkit-scrollbar-thumb,
+.wavesurfer-wrapper *::part(scroll)::-webkit-scrollbar-thumb {
+  background: #4b5563; /* slate-600 */
+  border-radius: 3px;
+}
+
+.wavesurfer-wrapper::part(scroll)::-webkit-scrollbar-thumb:hover,
+.wavesurfer-wrapper *::part(scroll)::-webkit-scrollbar-thumb:hover {
+  background: #6b7280; /* slate-500 */
+}

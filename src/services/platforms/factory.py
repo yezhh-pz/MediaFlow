@@ -20,7 +20,8 @@ class PlatformFactory:
             cls.register_handler(DouyinPlatform())
             cls.register_handler(KuaishouPlatform())
 
+        url_str = str(url)  # Ensure url is a string (handles HttpUrl from Pydantic)
         for handler in cls._handlers:
-            if await handler.match(url):
+            if await handler.match(url_str):
                 return handler
         return None  # No specific handler found (caller should fallback to yt-dlp)

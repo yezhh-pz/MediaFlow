@@ -82,6 +82,68 @@ export function useTranscriber() {
     }
   }, [tasks]);
 
+  // Check for pending file from TaskMonitor navigation
+  // Check for pending file from TaskMonitor navigation
+  const checkPendingNavigation = useCallback(() => {
+    const pendingFile = sessionStorage.getItem("mediaflow:pending_file");
+    if (pendingFile) {
+      try {
+        const data = JSON.parse(pendingFile);
+        if (data.video_path) {
+          // Get file size using Electron API if available
+          const loadFileWithSize = async () => {
+            let fileSize = 0;
+            if (window.electronAPI?.getFileSize) {
+              try {
+                fileSize = await window.electronAPI.getFileSize(
+                  data.video_path,
+                );
+              } catch (e) {
+                console.warn("[Transcriber] Could not get file size:", e);
+              }
+            }
+            const fakeFile = {
+              name: data.video_path.split(/[\\/]/).pop() || "video.mp4",
+              path: data.video_path,
+              size: fileSize,
+              type: "video/mp4",
+            } as unknown as File;
+            setFile(fakeFile);
+            console.log(
+              "[Transcriber] Auto-loaded file from navigation:",
+              data.video_path,
+              "size:",
+              fileSize,
+            );
+          };
+          loadFileWithSize();
+        }
+        sessionStorage.removeItem("mediaflow:pending_file");
+      } catch (e) {
+        console.error("[Transcriber] Failed to parse pending file:", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    checkPendingNavigation();
+
+    const handleNavigate = (e: CustomEvent) => {
+      if (e.detail === "transcriber") {
+        checkPendingNavigation();
+      }
+    };
+    window.addEventListener(
+      "mediaflow:navigate",
+      handleNavigate as EventListener,
+    );
+    return () =>
+      window.removeEventListener(
+        "mediaflow:navigate",
+        handleNavigate as EventListener,
+      );
+  }, [checkPendingNavigation]);
+
   // Poll for active task updates
   useEffect(() => {
     if (!activeTaskId) return;
@@ -144,15 +206,44 @@ export function useTranscriber() {
     }
   };
 
-  const handleSendToTranslator = () => {
-    if (!result) return;
-    let textContent = "";
-    result.segments.forEach((seg, i) => {
-      const start = new Date(seg.start * 1000).toISOString().substr(11, 8);
-      const end = new Date(seg.end * 1000).toISOString().substr(11, 8);
-      textContent += `${i + 1}\n${start},000 --> ${end},000\n${seg.text}\n\n`;
-    });
-    localStorage.setItem("translator_sourceText", textContent);
+  const handleSendToTranslator = (payload?: {
+    video_path: string;
+    subtitle_path: string;
+  }) => {
+    // Support potential payload from component, or fall back to internal result
+    const targetResult =
+      payload ||
+      (result
+        ? {
+            video_path: (file as any)?.path,
+            subtitle_path: result.srt_path,
+          }
+        : null);
+
+    if (!targetResult || !targetResult.subtitle_path) {
+      console.warn(
+        "[Transcriber] handleSendToTranslator: No valid result/path available",
+        targetResult,
+      );
+      alert("No subtitle file available to translate.");
+      return;
+    }
+
+    console.log("[Transcriber] Navigating to Translator with:", targetResult);
+
+    // Use the unified navigation protocol
+    sessionStorage.setItem(
+      "mediaflow:pending_file",
+      JSON.stringify({
+        video_path: targetResult.video_path,
+        subtitle_path: targetResult.subtitle_path,
+      }),
+    );
+
+    // Clear legacy storage to avoid confusion
+    localStorage.removeItem("translator_sourceSegments");
+    localStorage.removeItem("translator_targetSegments");
+
     window.dispatchEvent(
       new CustomEvent("mediaflow:navigate", { detail: "translator" }),
     );
@@ -160,8 +251,18 @@ export function useTranscriber() {
 
   const handleSendToEditor = () => {
     if (file && (file as any).path) {
-      localStorage.setItem("editor_last_media_path", (file as any).path);
-      localStorage.removeItem("editor_last_subtitles");
+      // Use unified navigation protocol
+      sessionStorage.setItem(
+        "mediaflow:pending_file",
+        JSON.stringify({
+          video_path: (file as any).path,
+          // If we have an SRT path in the result, pass it too?
+          // For now, EditorIO tries to load related SRT automatically, but being explicit is better
+          subtitle_path: result?.srt_path || null,
+        }),
+      );
+
+      localStorage.removeItem("editor_last_subtitles"); // Clear old session legacy
       window.dispatchEvent(
         new CustomEvent("mediaflow:navigate", { detail: "editor" }),
       );
@@ -185,6 +286,7 @@ export function useTranscriber() {
           console.warn("Failed to get path via electronAPI:", err);
         }
       }
+      setResult(null); // Clear old results
       setFile(droppedFile);
     }
   };
@@ -199,6 +301,7 @@ export function useTranscriber() {
           size: fileData.size,
           type: "video/mp4",
         } as unknown as File;
+        setResult(null); // Clear old results
         setFile(fakeFile);
       }
     } else {
@@ -208,11 +311,21 @@ export function useTranscriber() {
       input.onchange = (e) => {
         const files = (e.target as HTMLInputElement).files;
         if (files && files.length > 0) {
+          setResult(null); // Clear old results
           setFile(files[0]);
         }
       };
       input.click();
     }
+  };
+
+  // Wrapper to clear old results when setting a new file
+  const handleSetFile = (newFile: File | null) => {
+    if (newFile !== file) {
+      setResult(null); // Clear old results when file changes
+      localStorage.removeItem("transcriber_result");
+    }
+    setFile(newFile);
   };
 
   return {
@@ -226,7 +339,7 @@ export function useTranscriber() {
       activeTask: tasks.find((t) => t.id === activeTaskId),
     },
     actions: {
-      setFile,
+      setFile: handleSetFile,
       setModel,
       setDevice,
       startTranscription: handleTranscribe,

@@ -1,5 +1,5 @@
 
-import { Clapperboard, Save, Wand2 } from "lucide-react";
+import { Clapperboard, Save, Wand2, Download } from "lucide-react";
 import React from "react";
 
 interface EditorHeaderProps {
@@ -8,6 +8,7 @@ interface EditorHeaderProps {
     onOpenFile: () => void;
     onSave: () => void;
     onSmartSplit: () => Promise<void>;
+    onSynthesize: () => void;
 }
 
 export function EditorHeader({
@@ -15,7 +16,8 @@ export function EditorHeader({
     setAutoScroll,
     onOpenFile,
     onSave,
-    onSmartSplit
+    onSmartSplit,
+    onSynthesize
 }: EditorHeaderProps) {
     return (
         <header className="h-14 border-b border-slate-700 flex items-center justify-between pl-4 pr-40 bg-slate-900 select-none" style={{ WebkitAppRegion: 'drag' } as any}>
@@ -46,6 +48,15 @@ export function EditorHeader({
                  >
                      <Wand2 size={16} /> <span className="hidden sm:inline">Smart Split</span>
                  </button>
+                 <div className="h-4 w-[1px] bg-slate-700 mx-2"></div>
+                 <button 
+                    onClick={onSynthesize}
+                    className="flex items-center gap-2 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 rounded text-sm transition-colors border border-emerald-500/30 px-3 py-1.5"
+                    title="Export Video with Subtitles"
+                 >
+                     <Download size={16} /> <span className="hidden sm:inline">Synthesize</span>
+                 </button>
+
 
                  <button 
                      onClick={onSave}

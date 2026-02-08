@@ -4,7 +4,11 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("electronAPI", {
   sendMessage: (message: any) => ipcRenderer.send("message-from-ui", message),
   openFile: () => ipcRenderer.invoke("dialog:openFile"),
+  openSubtitleFile: () => ipcRenderer.invoke("dialog:openSubtitleFile"),
   readFile: (filePath: string) => ipcRenderer.invoke("fs:readFile", filePath),
+  showSaveDialog: (options: any) =>
+    ipcRenderer.invoke("dialog:saveFile", options),
+  selectDirectory: () => ipcRenderer.invoke("dialog:selectDirectory"),
   showInExplorer: (filePath: string) =>
     ipcRenderer.invoke("shell:showInExplorer", filePath),
   // Cookie management
@@ -19,4 +23,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
     require("electron").webUtils.getPathForFile(file),
   writeFile: (filePath: string, content: string) =>
     ipcRenderer.invoke("fs:writeFile", filePath, content),
+  getFileSize: (filePath: string) =>
+    ipcRenderer.invoke("fs:getFileSize", filePath),
 });

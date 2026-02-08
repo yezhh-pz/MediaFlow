@@ -16,11 +16,15 @@ class Settings(BaseSettings):
     TEMP_DIR: Path = BASE_DIR / "temp"
     MODEL_DIR: Path = BASE_DIR / "models"
     OUTPUT_DIR: Path = BASE_DIR / "output"
+    USER_DATA_DIR: Path = BASE_DIR / "user_data"
     BIN_DIR: Path = BASE_DIR / "bin"
     
     # Executables
     FFMPEG_PATH: str = "ffmpeg"
     FFPROBE_PATH: str = "ffprobe"
+    
+    # Faster Whisper CLI
+    FASTER_WHISPER_CLI_PATH: str = r"D:\Software\Video\Faster-Whisper-XXL\faster-whisper-xxl.exe"
 
     # ASR Settings
     ASR_MAX_WORKERS: int = 2
@@ -46,7 +50,10 @@ class Settings(BaseSettings):
 
     def init_dirs(self):
         """Ensure critical directories exist."""
-        for path in [self.TEMP_DIR, self.MODEL_DIR, self.OUTPUT_DIR, self.BIN_DIR]:
+        for path in [self.TEMP_DIR, self.MODEL_DIR, self.OUTPUT_DIR, self.USER_DATA_DIR, self.BIN_DIR]:
             path.mkdir(parents=True, exist_ok=True)
+        
+        # Create subdirs in user_data
+        (self.USER_DATA_DIR / "watermarks").mkdir(exist_ok=True)
 
 settings = Settings()

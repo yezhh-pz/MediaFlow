@@ -22,10 +22,41 @@ async def run_pipeline(req: PipelineRequest, background_tasks: BackgroundTasks):
     Returns a Task ID immediately. Progress can be tracked via WebSocket.
     """
     try:
-        # Create Task
+        tm = _get_task_manager()
+        
+        # 1. Deduplication Check
+        existing_task_id = tm.find_task_by_params("pipeline", req.dict())
+        
+        if existing_task_id:
+            task = tm.get_task(existing_task_id)
+            if task:
+                # Case A: Task is already running or pending (Debounce)
+                if task.status in ["running", "pending"]:
+                    logger.info(f"Duplicate task request ignored: {existing_task_id}")
+                    return {
+                        "task_id": existing_task_id,
+                        "status": task.status,
+                        "message": "Task already active"
+                    }
+                
+                # Case B: Task is completed/failed/cancelled (Recycle)
+                # Reset task state and re-queue backend work
+                logger.info(f"Recycling existing task: {existing_task_id}")
+                await tm.reset_task(existing_task_id)
+                
+                # Re-run logic
+                background_tasks.add_task(_get_pipeline_runner().run, req.steps, existing_task_id)
+                
+                return {
+                    "task_id": existing_task_id,
+                    "status": "pending",
+                    "message": "Task restarted (Recycled)"
+                }
+
+        # 2. Create New Task
         # Store params for potential resume
         logger.info(f"Pipeline Request: task_name={req.task_name}, steps={len(req.steps)}")
-        task_id = await _get_task_manager().create_task(
+        task_id = await tm.create_task(
             "pipeline", 
             "Queued", 
             request_params=req.dict(), 

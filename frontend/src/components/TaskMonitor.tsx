@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTaskContext } from '../context/TaskContext';
-import { CheckCircle, AlertCircle, Loader, Clock, Pause, Play, Trash2, FolderOpen, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader, Clock, Pause, Play, Trash2, FolderOpen, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
 import { TaskTraceView } from './TaskTraceView';
 
 const ProgressBar: React.FC<{ progress: number }> = ({ progress }) => (
@@ -190,6 +190,71 @@ export const TaskMonitor: React.FC<{ filterTypes?: string[] }> = ({ filterTypes 
                                     >
                                         <FolderOpen size={16} color="#3b82f6" />
                                     </button>
+                                )}
+
+                                {/* Smart Navigation: Next Step Buttons */}
+                                {task.status === 'completed' && (task.result?.video_path || task.result?.path) && (
+                                    <div style={{ display: 'flex', gap: 6, marginLeft: 6 }}>
+                                        {/* Transcribe Button */}
+                                        <button
+                                            onClick={() => {
+                                                const subPath = task.result?.subtitle_path || task.result?.srt_path;
+                                                sessionStorage.setItem('mediaflow:pending_file', JSON.stringify({
+                                                    video_path: task.result?.video_path || task.result?.path,
+                                                    subtitle_path: subPath // Pass it if exists, Transcriber can ignore or use it
+                                                }));
+                                                window.dispatchEvent(new CustomEvent('mediaflow:navigate', { detail: 'transcriber' }));
+                                            }}
+                                            title="Open in Transcriber"
+                                            style={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                gap: 4,
+                                                background: '#4F46E5', // Indigo
+                                                border: 'none', 
+                                                cursor: 'pointer', 
+                                                padding: '4px 8px',
+                                                borderRadius: 4,
+                                                color: '#fff',
+                                                fontSize: '0.75em'
+                                            }}
+                                        >
+                                            Transcribe
+                                            <ArrowRight size={12} />
+                                        </button>
+
+                                        {/* Translate Button */}
+                                        <button
+                                            onClick={() => {
+                                                const subPath = task.result?.subtitle_path || task.result?.srt_path;
+                                                if (!subPath) return;
+
+                                                sessionStorage.setItem('mediaflow:pending_file', JSON.stringify({
+                                                    video_path: task.result?.video_path || task.result?.path,
+                                                    subtitle_path: subPath
+                                                }));
+                                                window.dispatchEvent(new CustomEvent('mediaflow:navigate', { detail: 'translator' }));
+                                            }}
+                                            disabled={!task.result?.subtitle_path && !task.result?.srt_path}
+                                            title={task.result?.subtitle_path || task.result?.srt_path ? 'Open in Translator' : 'No subtitle found'}
+                                            style={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                gap: 4,
+                                                background: (task.result?.subtitle_path || task.result?.srt_path) ? '#10b981' : '#374151', // Emerald or Gray-700
+                                                border: 'none', 
+                                                cursor: (task.result?.subtitle_path || task.result?.srt_path) ? 'pointer' : 'not-allowed',
+                                                padding: '4px 8px',
+                                                borderRadius: 4,
+                                                color: (task.result?.subtitle_path || task.result?.srt_path) ? '#fff' : '#9ca3af', // White or Gray-400
+                                                fontSize: '0.75em',
+                                                opacity: (task.result?.subtitle_path || task.result?.srt_path) ? 1 : 0.8
+                                            }}
+                                        >
+                                            Translate
+                                            <ArrowRight size={12} />
+                                        </button>
+                                    </div>
                                 )}
 
                                 {/* Expand/Collapse Trace */}

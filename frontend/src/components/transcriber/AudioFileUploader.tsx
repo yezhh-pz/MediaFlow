@@ -26,7 +26,7 @@ export function AudioFileUploader({ file, onFileSelect, onFileDrop, onClearFile 
             <p className="text-xs text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
           </div>
           <button 
-            onClick={onClearFile}
+            onClick={(e) => { e.stopPropagation(); onFileSelect(); }}
             className="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded text-slate-300 transition-colors"
           >
             Change File

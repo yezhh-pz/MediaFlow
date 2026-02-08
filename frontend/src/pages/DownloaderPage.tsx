@@ -4,24 +4,16 @@ import { useDownloaderController } from "../hooks/useDownloaderController";
 import { DownloaderInput } from "../components/downloader/DownloaderInput";
 import { VideoDownloadOptions } from "../components/downloader/VideoDownloadOptions";
 import { PlaylistDialog } from "../components/downloader/PlaylistDialog";
-import { DownloadResultCard } from "../components/downloader/DownloadResultCard";
+
 
 export function DownloaderPage() {
   const {
     // State
-    url, loading, analyzing, error, result, playlistInfo, showPlaylistDialog, selectedItems, downloadSubs, resolution,
+    url, loading, analyzing, error, playlistInfo, showPlaylistDialog, selectedItems, downloadSubs, resolution,
     // Actions
     setUrl, setResolution, setDownloadSubs, setShowPlaylistDialog, setSelectedItems,
     analyzeAndDownload, downloadPlaylist, toggleItemSelection
   } = useDownloaderController();
-
-  const handleOpenFolder = () => {
-    if (result?.video_path && window.electronAPI?.showInExplorer) {
-      window.electronAPI.showInExplorer(result.video_path);
-    } else {
-      alert("Cannot open folder: path not available or not running in Electron");
-    }
-  };
 
   const handlePaste = async () => {
     try {
@@ -72,11 +64,7 @@ export function DownloaderPage() {
           </div>
         )}
 
-        {result && (
-            <div className="mt-6">
-                <DownloadResultCard result={result} onOpenFolder={handleOpenFolder} />
-            </div>
-        )}
+
         
         {/* Task Monitor */}
         <TaskMonitor filterTypes={['pipeline', 'download']} />
