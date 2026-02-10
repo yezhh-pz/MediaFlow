@@ -8,73 +8,88 @@ export const TranscriberPage = () => {
   const { state, actions } = useTranscriber();
 
   return (
-    <div className="h-full flex flex-col p-6 gap-6 bg-slate-900 text-slate-100 overflow-hidden">
-      <header className="flex justify-between items-center bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-700 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-purple-500/20 rounded-lg">
-            <FileAudio className="w-6 h-6 text-purple-400" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Transcriber
-            </h1>
-            <p className="text-xs text-slate-400">Faster-Whisper • VAD Slicing • Local Processing</p>
-          </div>
+    <div className="w-full h-full px-6 pb-6 pt-5 flex flex-col overflow-hidden">
+      {/* Header */}
+      <header className="flex-none mb-6 flex items-center gap-4">
+        <div className="p-2 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl border border-white/5 shadow-lg shadow-purple-500/10">
+          <FileAudio className="w-6 h-6 text-purple-400" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Audio Transcriber</h1>
+          <p className="text-slate-400 text-sm mt-0.5">Faster-Whisper • VAD Slicing • Local Processing</p>
         </div>
       </header>
 
-      {/* Main Content Area - Flexible height */}
-      <div className="flex-1 min-h-0 grid grid-cols-12 gap-6">
-        {/* Left Panel: Controls */}
-        <div className="col-span-4 flex flex-col gap-4 overflow-y-auto">
-          
-          {/* File Upload */}
-          <AudioFileUploader 
-            file={state.file} 
-            onFileSelect={actions.onFileSelect} 
-            onFileDrop={actions.onFileDrop}
-            onClearFile={(e) => { e.stopPropagation(); actions.setFile(null); }}
-          />
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6 overflow-hidden">
+        {/* Left Column: Controls */}
+        <div className="w-full lg:w-[420px] flex-none flex flex-col h-full bg-[#1a1a1a] border border-white/5 rounded-2xl shadow-2xl overflow-hidden">
+           <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+              <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                 <div className="flex items-center justify-center w-4 h-4 rounded-full bg-purple-500/20">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+                 </div>
+                 New Task
+              </h3>
+           </div>
 
-          {/* Settings */}
-          <TranscriptionConfig 
-            model={state.model}
-            setModel={actions.setModel}
-            device={state.device}
-            setDevice={actions.setDevice}
-            onTranscribe={actions.startTranscription}
-            isFileSelected={!!state.file}
-            activeTaskId={state.activeTaskId}
-          />
+            <div className="p-5 flex-1 flex flex-col gap-5 min-h-0 overflow-y-auto custom-scrollbar">
+               <AudioFileUploader 
+                 file={state.file} 
+                 onFileSelect={actions.onFileSelect} 
+                 onFileDrop={actions.onFileDrop}
+                 className="w-full min-h-[120px]"
+               />
 
-          {/* Progress Card (Local Task View) */}
-          {state.activeTask && (
-            <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 shrink-0">
-               <div className="flex justify-between items-center mb-2">
-                 <span className="text-xs font-semibold text-purple-300">
-                   {state.activeTask.status.toUpperCase()}
-                 </span>
-                 <span className="text-xs text-slate-400">{state.activeTask.progress.toFixed(0)}%</span>
-               </div>
-               <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                 <div 
-                   className="h-full bg-purple-500 transition-all duration-300"
-                   style={{ width: `${state.activeTask.progress}%` }}
-                 />
-               </div>
-               <p className="text-xs text-slate-400 mt-2 truncate">
-                 {state.activeTask.message || "Initializing..."}
-               </p>
-            </div>
-          )}
+              <div className="flex flex-col gap-6 shrink-0">
+                <TranscriptionConfig 
+                  model={state.model}
+                  setModel={actions.setModel}
+                  device={state.device}
+                  setDevice={actions.setDevice}
+                  onTranscribe={actions.startTranscription}
+                  isFileSelected={!!state.file}
+                  activeTaskId={state.activeTaskId}
+                />
+
+                {/* Progress Card (Persistent) */}
+                <div className={`border rounded-xl p-4 transition-all duration-500 ${
+                  state.activeTask 
+                    ? "bg-purple-500/10 border-purple-500/20 shadow-[0_0_20px_-5px_rgba(168,85,247,0.15)]" 
+                    : "bg-white/[0.02] border-white/5"
+                }`}>
+                   <div className="flex justify-between items-center mb-3">
+                     <span className={`text-xs font-bold uppercase tracking-wider transition-colors duration-300 ${state.activeTask ? "text-purple-400" : "text-slate-500"}`}>
+                       {state.activeTask ? state.activeTask.status : "System Ready"}
+                     </span>
+                     <span className={`text-xs font-mono transition-colors duration-300 ${state.activeTask ? "text-purple-300" : "text-slate-600"}`}>
+                        {state.activeTask ? state.activeTask.progress.toFixed(0) : 0}%
+                     </span>
+                   </div>
+                   <div className={`h-1.5 rounded-full overflow-hidden mb-3 transition-colors duration-300 ${state.activeTask ? "bg-purple-900/40" : "bg-white/5"}`}>
+                     <div 
+                       className={`h-full transition-all duration-300 ease-out ${
+                           state.activeTask ? "bg-gradient-to-r from-purple-500 to-pink-500" : "bg-slate-700 w-0"
+                       }`}
+                       style={{ width: `${state.activeTask ? state.activeTask.progress : 0}%` }}
+                     />
+                   </div>
+                   <div className={`text-xs truncate flex items-center gap-2 transition-colors duration-300 ${state.activeTask ? "text-purple-300/80" : "text-slate-500"}`}>
+                     <span className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${state.activeTask ? "bg-purple-500 animate-pulse shadow-[0_0_8px_rgba(168,85,247,0.6)]" : "bg-slate-700"}`} />
+                     {state.activeTask ? (state.activeTask.message || "Processing...") : "Waiting to start..."}
+                   </div>
+                </div>
+              </div>
+           </div>
         </div>
 
         {/* Right Panel: Results */}
-        <TranscriptionResults 
-            result={state.result}
-            onSendToEditor={actions.sendToEditor}
-            onSendToTranslator={actions.sendToTranslator}
-        />
+        <div className="flex-1 min-w-0 h-full flex flex-col">
+            <TranscriptionResults 
+                result={state.result}
+                onSendToEditor={actions.sendToEditor}
+                onSendToTranslator={actions.sendToTranslator}
+            />
+        </div>
       </div>
     </div>
   );

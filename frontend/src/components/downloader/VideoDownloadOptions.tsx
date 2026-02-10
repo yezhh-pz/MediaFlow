@@ -1,5 +1,5 @@
 import React from "react";
-import { Download } from "lucide-react";
+import { Download, ChevronDown, Check } from "lucide-react";
 
 interface VideoDownloadOptionsProps {
   resolution: string;
@@ -23,130 +23,96 @@ export function VideoDownloadOptions({
   onAction,
 }: VideoDownloadOptionsProps) {
   return (
-    <div style={{ 
-      display: "grid", 
-      gridTemplateColumns: "1fr auto auto", 
-      gap: 20,
-      alignItems: "end" 
-    }}>
-      {/* Resolution Selector */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <label style={{ fontSize: "0.85em", color: "#9ca3af", fontWeight: 500, letterSpacing: "0.02em" }}>
-          QUALITY
-        </label>
-        <div style={{ position: "relative" }}>
-          <select
-            value={resolution}
-            onChange={(e) => setResolution(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              background: "#252525",
-              border: "1px solid #404040",
-              color: "white",
-              borderRadius: 8,
-              outline: "none",
-              cursor: "pointer",
-              appearance: "none",
-              fontSize: "0.95em",
-            }}
-          >
-            <option value="best">Best Quality (Default)</option>
-            <option value="4k">4K Ultra HD</option>
-            <option value="2k">2K QHD</option>
-            <option value="1080p">1080p Full HD</option>
-            <option value="720p">720p HD</option>
-            <option value="480p">480p SD</option>
-            <option value="audio">Audio Only (m4a/mp3)</option>
-          </select>
-          <div style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "#6b7280" }}>
-            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+    <div className="flex flex-col gap-4">
+      
+      {/* Settings Grid */}
+      <div className="grid grid-cols-2 gap-4">
+          {/* Quality Card */}
+          <div className="bg-black/20 backdrop-blur-md rounded-xl p-4 border border-white/5 flex flex-col gap-3 group hover:border-white/10 transition-colors">
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+              Quality
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-indigo-300 border border-indigo-500/20">MP4</span>
+            </label>
+            <div className="relative">
+              <select
+                value={resolution}
+                onChange={(e) => setResolution(e.target.value)}
+                className="w-full h-10 bg-black/40 border border-white/10 rounded-lg px-3 text-sm text-white focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 appearance-none cursor-pointer hover:bg-black/60 transition-all font-medium"
+              >
+                <option value="best" className="bg-[#1a1a1a] text-white">Best Quality (Default)</option>
+                <option value="4k" className="bg-[#1a1a1a] text-white">4K Ultra HD</option>
+                <option value="2k" className="bg-[#1a1a1a] text-white">2K QHD</option>
+                <option value="1080p" className="bg-[#1a1a1a] text-white">1080p Full HD</option>
+                <option value="720p" className="bg-[#1a1a1a] text-white">720p HD</option>
+                <option value="480p" className="bg-[#1a1a1a] text-white">480p SD</option>
+                <option value="audio" className="bg-[#1a1a1a] text-white">Audio Only (m4a/mp3)</option>
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                <ChevronDown size={14} />
+              </div>
+            </div>
           </div>
-        </div>
+
+          {/* Subtitles Card */}
+           <label 
+              className={`rounded-xl p-4 border transition-all cursor-pointer select-none group relative overflow-hidden flex flex-col justify-between
+                ${downloadSubs 
+                  ? "bg-indigo-500/10 border-indigo-500/30 shadow-[0_0_15px_-3px_rgba(99,102,241,0.15)]" 
+                  : "bg-black/20 border-white/5 hover:bg-black/30 hover:border-white/10 backdrop-blur-md"
+                }
+              `}
+            >
+              <div className="flex justify-between items-start">
+                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Subtitles</span>
+                   <div className={`w-5 h-5 rounded flex items-center justify-center transition-all duration-300 border
+                      ${downloadSubs
+                          ? "bg-indigo-500 border-indigo-500 rotate-0 scale-100 shadow-sm" 
+                          : "border-slate-600 rotate-90 scale-90 bg-transparent"
+                      }
+                    `}>
+                      {downloadSubs && <Check size={14} className="text-white" strokeWidth={3} />}
+                   </div>
+              </div>
+              
+              <div className={`text-sm font-medium mt-2 transition-colors ${downloadSubs ? "text-indigo-200" : "text-slate-400 group-hover:text-slate-300"}`}>
+                  Include Captions
+              </div>
+              
+              <input 
+                type="checkbox" 
+                checked={downloadSubs} 
+                onChange={e => setDownloadSubs(e.target.checked)}
+                className="hidden"
+              />
+          </label>
       </div>
 
-      {/* Subtitles Toggle */}
-      <label 
-        style={{ 
-          display: "flex", 
-          alignItems: "center", 
-          gap: 12, 
-          cursor: "pointer",
-          background: downloadSubs ? "rgba(99, 102, 241, 0.1)" : "#252525",
-          border: `1px solid ${downloadSubs ? "#6366f1" : "#404040"}`,
-          padding: "11px 16px",
-          borderRadius: 8,
-          height: 46, // Match select height roughly
-          transition: "all 0.2s"
-        }}
-      >
-        <div style={{
-          width: 18,
-          height: 18,
-          borderRadius: 4,
-          border: `2px solid ${downloadSubs ? "#6366f1" : "#6b7280"}`,
-          background: downloadSubs ? "#6366f1" : "transparent",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          transition: "all 0.2s"
-        }}>
-          {downloadSubs && (
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M2.5 6L5 8.5L9.5 3.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          )}
-        </div>
-        <input 
-          type="checkbox" 
-          checked={downloadSubs} 
-          onChange={e => setDownloadSubs(e.target.checked)}
-          style={{ display: "none" }}
-        />
-        <span style={{ fontSize: "0.95em", fontWeight: 500, color: downloadSubs ? "#fff" : "#9ca3af" }}>
-          Download Subtitles
-        </span>
-      </label>
-
-      {/* Action Button */}
+      {/* Download Button */}
       <button
         onClick={onAction}
         disabled={loading || analyzing || !url}
-        style={{
-          height: 46,
-          background: loading || analyzing ? "#374151" : "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-          color: loading || analyzing ? "#9ca3af" : "#fff",
-          border: "none",
-          borderRadius: 8,
-          padding: "0 28px",
-          fontSize: "1em",
-          fontWeight: 600,
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          cursor: loading || analyzing || !url ? "not-allowed" : "pointer",
-          boxShadow: loading ? "none" : "0 4px 6px -1px rgba(79, 70, 229, 0.2), 0 2px 4px -1px rgba(79, 70, 229, 0.1)",
-          transition: "all 0.2s",
-        }}
-        onMouseEnter={(e) => {
-          if (!loading && !analyzing && url) {
-            e.currentTarget.style.transform = "translateY(-1px)";
-            e.currentTarget.style.boxShadow = "0 10px 15px -3px rgba(79, 70, 229, 0.3), 0 4px 6px -2px rgba(79, 70, 229, 0.1)";
+        className={`h-14 rounded-xl font-bold text-base flex items-center justify-center gap-3 transition-all shadow-lg relative overflow-hidden group/btn
+          ${loading || analyzing || !url
+            ? "bg-slate-800/50 border border-white/5 text-slate-500 cursor-not-allowed shadow-none"
+            : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 active:translate-y-0 border border-white/10"
           }
-        }}
-        onMouseLeave={(e) => {
-          if (loading || analyzing || !url) return;
-          e.currentTarget.style.transform = "none";
-          e.currentTarget.style.boxShadow = "0 4px 6px -1px rgba(79, 70, 229, 0.2), 0 2px 4px -1px rgba(79, 70, 229, 0.1)";
-        }}
+        `}
       >
-        <span style={{ whiteSpace: "nowrap" }}>
-          {analyzing ? "Analyzing..." : loading ? "Downloading..." : "Start Download"}
+        <div className="absolute inset-0 bg-white/20 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-300 pointer-events-none" />
+        
+        {/* Loading Spinner */}
+        {(loading || analyzing) && (
+             <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 z-20 backdrop-blur-sm">
+                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+             </div>
+        )}
+
+        <span className="relative z-10">
+          {analyzing ? "Analyzing Stream..." : loading ? "Downloading Media..." : "Download Media"}
         </span>
-        {!loading && !analyzing && <Download size={20} />}
+        {!loading && !analyzing && <Download size={20} className="relative z-10 stroke-[2.5]" />}
       </button>
+
     </div>
   );
 }

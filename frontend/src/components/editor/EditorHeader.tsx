@@ -1,5 +1,5 @@
 
-import { Clapperboard, Save, Wand2, Download } from "lucide-react";
+import { Clapperboard, Save, Wand2, Download, FolderOpen } from "lucide-react";
 import React from "react";
 
 interface EditorHeaderProps {
@@ -20,47 +20,75 @@ export function EditorHeader({
     onSynthesize
 }: EditorHeaderProps) {
     return (
-        <header className="h-14 border-b border-slate-700 flex items-center justify-between pl-4 pr-40 bg-slate-900 select-none" style={{ WebkitAppRegion: 'drag' } as any}>
-            <div className="flex items-center gap-3 no-drag" style={{ WebkitAppRegion: 'no-drag' } as any}>
-                <Clapperboard className="text-indigo-500" />
-                <h1 className="font-bold text-lg">Editor Workspace</h1>
-                <div className="h-4 w-[1px] bg-slate-700 mx-2"></div>
-                <button onClick={onOpenFile} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 px-3 py-1.5 rounded transition-colors">
-                    Open Media
+        <header 
+            className="flex-none pt-6 pb-6 pl-6 pr-32 flex items-center justify-between select-none relative z-50 transition-all"
+            style={{ WebkitAppRegion: 'drag' } as any}
+        >
+            {/* Window Controls Safe Zone (Absolute Top Right) */}
+            <div className="absolute top-0 right-0 w-32 h-10 z-50 no-drag" style={{ WebkitAppRegion: 'no-drag' } as any} />
+
+            {/* Left: Brand & File */}
+            <div className="flex items-center gap-5 no-drag" style={{ WebkitAppRegion: 'no-drag' } as any}>
+                <div className="flex items-center gap-4">
+                    <div className="p-2 bg-gradient-to-br from-indigo-500/20 to-violet-500/20 rounded-2xl border border-white/5 shadow-lg shadow-indigo-500/10">
+                        <Clapperboard className="w-6 h-6 text-indigo-400" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-bold text-white tracking-tight leading-none">Editor Workspace</h1>
+                        <p className="text-slate-400 text-sm font-medium tracking-wide mt-1">Timeline & Subtitles</p>
+                    </div>
+                </div>
+                
+                <div className="h-8 w-[1px] bg-white/5 mx-2" />
+                
+                <button 
+                  onClick={onOpenFile} 
+                  className="flex items-center gap-2 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 hover:border-indigo-500/30 text-indigo-300 px-4 py-2 rounded-lg text-xs font-medium transition-all shadow-sm active:scale-95 group"
+                  title="Open Media File (Ctrl+O)"
+                >
+                    <FolderOpen size={16} className="group-hover:text-indigo-200 transition-colors" />
+                    <span>Open Media</span>
                 </button>
             </div>
-            <div className="flex items-center gap-2 no-drag" style={{ WebkitAppRegion: 'no-drag' } as any}>
-                 <div className="flex items-center gap-2 mr-4">
+
+            {/* Right: Actions */}
+            <div className="flex items-center gap-4 no-drag" style={{ WebkitAppRegion: 'no-drag' } as any}>
+                 <div className="flex items-center gap-2 mr-4 bg-white/5 px-3 py-2 rounded-lg border border-white/5 shadow-inner">
                     <input 
                         type="checkbox" 
                         id="autoScroll" 
                         checked={autoScroll} 
                         onChange={(e) => setAutoScroll(e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-indigo-500"
+                        className="w-4 h-4 rounded border-white/10 bg-white/5 text-indigo-500 focus:ring-1 focus:ring-indigo-500/50 cursor-pointer"
                     />
-                    <label htmlFor="autoScroll" className="text-xs text-slate-400 select-none cursor-pointer">Auto-Scroll</label>
+                    <label htmlFor="autoScroll" className="text-xs text-slate-400 select-none cursor-pointer font-medium hover:text-slate-200 transition-colors whitespace-nowrap">Auto-Scroll</label>
                  </div>
                  
-                 <button 
-                    onClick={onSmartSplit}
-                    className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 px-3 py-1.5 rounded text-sm transition-colors text-slate-300"
-                    title="Auto-split by Silence"
-                 >
-                     <Wand2 size={16} /> <span className="hidden sm:inline">Smart Split</span>
-                 </button>
-                 <div className="h-4 w-[1px] bg-slate-700 mx-2"></div>
-                 <button 
-                    onClick={onSynthesize}
-                    className="flex items-center gap-2 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 rounded text-sm transition-colors border border-emerald-500/30 px-3 py-1.5"
-                    title="Export Video with Subtitles"
-                 >
-                     <Download size={16} /> <span className="hidden sm:inline">Synthesize</span>
-                 </button>
+                 <div className="flex items-center gap-2">
+                     <button 
+                        onClick={onSmartSplit}
+                        className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 text-indigo-300 px-4 py-2 rounded-lg text-xs font-medium transition-all shadow-sm active:scale-95 group"
+                        title="Auto-split by Silence"
+                     >
+                         <Wand2 size={16} className="group-hover:text-indigo-200 transition-colors" /> 
+                         <span className="hidden xl:inline">Smart Split</span>
+                     </button>
 
+                     <button 
+                        onClick={onSynthesize}
+                        className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 text-emerald-300 px-4 py-2 rounded-lg text-xs font-medium transition-all shadow-sm active:scale-95 group"
+                        title="Export Video with Subtitles"
+                     >
+                         <Download size={16} className="group-hover:text-emerald-200 transition-colors" /> 
+                         <span>Synthesize</span>
+                     </button>
+                 </div>
+
+                 <div className="h-6 w-[1px] bg-white/10 mx-1" />
 
                  <button 
                      onClick={onSave}
-                     className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 rounded text-sm font-medium transition-colors"
+                     className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-lg text-xs font-bold transition-all shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 active:scale-95 ml-1"
                  >
                      <Save size={16} /> Save
                  </button>

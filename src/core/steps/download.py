@@ -41,7 +41,7 @@ class DownloadStep(PipelineStep):
 
         # Run download async (it handles thread pool internally)
         downloader = _get_downloader()
-        asset = await downloader.download(
+        result = await downloader.download(
             url, 
             proxy=params.get("proxy"),
             playlist_title=params.get("playlist_title"),
@@ -54,14 +54,25 @@ class DownloadStep(PipelineStep):
             filename=params.get("filename")
         )
         
+        if not result.success:
+            raise Exception(result.error or "Download failed with unknown error")
+
+        # Find video file
+        video_file = next((f for f in result.files if f.type == "video"), None)
+        if not video_file:
+            raise Exception("Download succeeded but no video file was returned")
+
         # Store result in context
-        ctx.set("video_path", asset.path)
-        ctx.set("media_filename", asset.filename)
-        ctx.set("title", asset.title)
+        ctx.set("video_path", video_file.path)
+        ctx.set("media_filename", result.meta.get("filename", "unknown.mp4"))
+        ctx.set("title", result.meta.get("title", "Unknown"))
         
-        if asset.subtitle_path:
-            ctx.set("subtitle_path", asset.subtitle_path)
-        logger.success(f"Step Download finished. Path: {asset.path}")
+        # Check for subtitles
+        subtitle_file = next((f for f in result.files if f.type == "subtitle"), None)
+        if subtitle_file:
+            ctx.set("subtitle_path", subtitle_file.path)
+            
+        logger.success(f"Step Download finished. Path: {video_file.path}")
 
 
 # Register at module level

@@ -3,7 +3,7 @@ import time
 from typing import Any, Dict, List
 from loguru import logger
 
-from src.models.schemas import PipelineStepRequest
+from src.models.schemas import PipelineStepRequest, TaskResult, FileRef
 from src.core.context import PipelineContext
 from src.core.steps import StepRegistry
 from src.core.container import container, Services
@@ -64,23 +64,43 @@ class PipelineRunner:
         
         # Determine final status
         if task_id:
-            # Ensure data is serializable
-            safe_data = {}
-            for k, v in ctx.data.items():
-                if hasattr(v, 'as_posix'):  # Path objects
-                    safe_data[k] = str(v)
-                else:
-                    safe_data[k] = v
+            # Construct TaskResult
+            files = []
+            meta = {}
             
-            # Add trace to result
-            safe_data["execution_trace"] = ctx.trace
+            # Extract files and meta from context
+            for k, v in ctx.data.items():
+                val_str = str(v) if hasattr(v, 'as_posix') else v
+                
+                # Heuristic to identify files
+                if k.endswith("_path") and isinstance(val_str, str):
+                    # Guess type
+                    ftype = "file"
+                    if "video" in k: ftype = "video"
+                    elif "audio" in k: ftype = "audio"
+                    elif "subtitle" in k or "srt" in k: ftype = "subtitle"
+                    elif "image" in k: ftype = "image"
+                    
+                    files.append(FileRef(type=ftype, path=val_str, label=k))
+                    meta[k] = val_str # Keep in meta for backward compat
+                else:
+                    meta[k] = val_str
+            
+            # Add trace to meta
+            meta["execution_trace"] = ctx.trace
+            
+            task_result = TaskResult(
+                success=True,
+                files=files,
+                meta=meta
+            )
 
             await tm.update_task(
                 task_id, 
                 status="completed", 
                 progress=100.0, 
                 message="Pipeline completed",
-                result=safe_data 
+                result=task_result.dict()
             )
 
         return {
@@ -92,4 +112,3 @@ class PipelineRunner:
 
 # Note: PipelineRunner is registered via container in main.py
 # The global instance is kept for backward compatibility but will be deprecated
-

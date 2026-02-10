@@ -63,7 +63,7 @@ export const TaskMonitor: React.FC<{ filterTypes?: string[] }> = ({ filterTypes 
     };
 
     return (
-        <div className="bg-[#1a1a1a] border border-white/5 rounded-xl shadow-2xl overflow-hidden mt-2 h-full flex flex-col">
+        <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl shadow-2xl overflow-hidden h-full flex flex-col">
             {/* ... Header ... */}
             <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/[0.02] flex-none">
                  {/* ... header content ... */}
@@ -195,31 +195,28 @@ export const TaskMonitor: React.FC<{ filterTypes?: string[] }> = ({ filterTypes 
                                             
                                             {/* Unified Actions based on available data */}
                                             {task.status === 'completed' && (() => {
-                                                const result = task.result || {};
+                                                const result = task.result;
                                                 const params = task.request_params || {};
+                                                const meta = result?.meta || {};
                                                 
-                                                // Resolve paths from Result (output) or Params (input)
-                                                // Priority: Output > Input
-                                                // Download: result.path / result.video_path
-                                                // Transcribe: params.audio_path (Input Video) / result.srt_path (Output)
-                                                // Translate: params.segments (No path) -> But maybe params.request_params has valid path if passed?
-                                                // Synthesis: result.video_path (Output) / params.video_path (Input)
+                                                // Helper to find file by type
+                                                const findFile = (type: string) => result?.files?.find(f => f.type === type)?.path;
+
+                                                // Resolve paths
+                                                // Video: FileRef > Meta > Params
+                                                const videoPath = findFile('video') || findFile('audio') || meta.video_path || meta.path || params.video_path || params.audio_path || params.file_path || params.context_path;
                                                 
-                                                const videoPath = result.video_path || result.path || params.video_path || params.audio_path || params.file_path || params.context_path || (task.type === 'download' ? result.file_path : null);
-                                                
-                                                // Special handling for Translate task output which might rely on params.source_file_path if result is empty
-                                                // And check if result has 'srt_path' (which it should if successful)
-                                                let srtPath = result.srt_path || result.subtitle_path || params.srt_path || params.subtitle_path;
+                                                // Subtitle: FileRef > Meta > Params
+                                                let srtPath = findFile('subtitle') || meta.srt_path || meta.subtitle_path || params.srt_path || params.subtitle_path;
                                                 
                                                 // Detailed fallback for Translate: scan params for .srt if srtPath is missing
                                                 if (!srtPath && task.type === 'translate') {
-                                                     // Try to find any param that looks like an SRT file path
-                                                     const candidates = Object.values(params).filter(v => typeof v === 'string' && v.endsWith('.srt'));
-                                                     if (candidates.length > 0) srtPath = candidates[0] as string;
+                                                     const candidates = Object.values(params).filter((v): v is string => typeof v === 'string' && v.endsWith('.srt'));
+                                                     if (candidates.length > 0) srtPath = candidates[0];
                                                 }
                                                 
-                                                // For 'Show in Folder', we prefer the output (e.g. download result), then any valid path
-                                                const contextPath = result.video_path || result.path || result.srt_path || result.file_path || videoPath || srtPath || params.output_path;
+                                                // Context for "Show in Folder"
+                                                const contextPath = videoPath || srtPath || meta.file_path || params.output_path;
 
                                                 return (
                                                     <div className="flex items-center gap-1 ml-2">
@@ -294,7 +291,7 @@ export const TaskMonitor: React.FC<{ filterTypes?: string[] }> = ({ filterTypes 
                                                 );
                                             })()}
 
-                                            {task.result?.execution_trace && (
+                                            {task.result?.meta?.execution_trace && (
                                                 <button 
                                                     onClick={() => toggleExpand(task.id)}
                                                     className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 transition-colors ml-1"
@@ -354,9 +351,8 @@ export const TaskMonitor: React.FC<{ filterTypes?: string[] }> = ({ filterTypes 
                                                     type: task.type, 
                                                     status: task.status, 
                                                     params_keys: Object.keys(task.request_params || {}),
-                                                    result_keys: Object.keys(task.result || {}),
-                                                    videoPath: task.result?.video_path || task.request_params?.video_path,
-                                                    srtPath: task.result?.srt_path || task.request_params?.srt_path
+                                                    result_files: task.result?.files,
+                                                    result_meta: task.result?.meta
                                                 }, null, 2)}
                                             </pre>
                                         </details>
@@ -365,10 +361,10 @@ export const TaskMonitor: React.FC<{ filterTypes?: string[] }> = ({ filterTypes 
                             </div>
 
                             {/* Execution Trace View */}
-                            {expandedTasks.has(task.id) && task.result?.execution_trace && (
+                            {expandedTasks.has(task.id) && task.result?.meta?.execution_trace && (
                                 <div className="mt-3 pl-[52px]">
                                     <div className="bg-black/30 rounded-lg overflow-hidden border border-white/5">
-                                        <TaskTraceView trace={task.result.execution_trace} />
+                                        <TaskTraceView trace={task.result.meta.execution_trace} />
                                     </div>
                                 </div>
                             )}

@@ -175,7 +175,7 @@ async def start_synthesis_task(req: SynthesisRequest, background_tasks: Backgrou
     # Note: create_task generates the ID and returns it
     task_id = await task_manager.create_task(
         task_type="synthesis",
-        task_name=f"Synthesize: {os.path.basename(req.video_path)}",
+        task_name=os.path.basename(req.video_path),
         initial_message="Queued",
         request_params=req.dict()
     )

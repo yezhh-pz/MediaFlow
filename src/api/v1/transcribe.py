@@ -46,11 +46,14 @@ async def transcribe_audio(req: TranscribeRequest, background_tasks: BackgroundT
     """
     logger.info(f"Received transcription request: {req.dict()}")
     try:
+        from pathlib import Path
+        filename = Path(req.audio_path).name or "Audio"
+
         # Create Task
         task_id = await _get_task_manager().create_task(
             task_type="transcribe",
             initial_message="Queued",
-            task_name=f"Transcribe {req.audio_path.split('/')[-1] or 'Audio'}",
+            task_name=filename,
             request_params=req.dict()
         )
         

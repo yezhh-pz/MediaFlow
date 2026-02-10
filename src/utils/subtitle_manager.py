@@ -125,8 +125,23 @@ class SubtitleManager:
             end_str = SubtitleManager.format_timestamp(seg.end)
             srt_content += f"{i + 1}\n{start_str} --> {end_str}\n{seg.text}\n\n"
             
-        srt_path = Path(audio_path).with_suffix(".srt")
+        # FIX: path.with_suffix() is dangerous if the stem contains dots (e.g. "Title ... [id]")
+        # It mistakes the dot in "..." as an extension separator and truncates the ID.
+        # Since we expect audio_path to be the full desired path (without extension, or with),
+        # we should ensure it ends with .srt safely.
+        
+        path_obj = Path(audio_path)
+        # Use with_suffix to replace the extension (e.g. .mp4 -> .srt)
+        # This addresses User feedback about .mp4.srt being counter-intuitive
+        srt_path = path_obj.with_suffix(".srt")
+
         try:
+            # Emergency Debug
+            with open("debug_subtitle.txt", "a", encoding="utf-8") as df:
+                 df.write(f"SubtitleManager.save_srt called\n")
+                 df.write(f"Input audio_path: {audio_path}\n")
+                 df.write(f"Calculated srt_path: {srt_path}\n")
+                 
             with open(srt_path, "w", encoding="utf-8") as f:
                 f.write(srt_content)
             return str(srt_path)

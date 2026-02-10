@@ -5,6 +5,20 @@ export interface SubtitleSegment {
   text: string;
 }
 
+export interface FileRef {
+  type: string; // "video", "audio", "subtitle", "image"
+  path: string;
+  label?: string;
+  mime_type?: string;
+}
+
+export interface TaskResult {
+  success: boolean;
+  files: FileRef[];
+  meta: Record<string, any>;
+  error?: string;
+}
+
 export interface Task {
   id: string;
   type: "download" | "transcribe" | "translate" | "pipeline" | "synthesis";
@@ -19,7 +33,7 @@ export interface Task {
   name?: string;
   message?: string;
   error?: string;
-  result?: any;
+  result?: TaskResult;
   request_params?: any;
   created_at: number;
 }

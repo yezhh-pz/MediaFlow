@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Play, MonitorPlay, Image as ImageIcon, Type, Download, Settings2 } from 'lucide-react';
+import { X, Play, MonitorPlay, Image as ImageIcon, Type, Download, Settings2, ChevronDown } from 'lucide-react';
 import type { SubtitleSegment } from '../../types/task';
 import { apiClient } from '../../api/client';
 
@@ -33,6 +33,7 @@ export const SynthesisDialog: React.FC<SynthesisDialogProps> = ({
     
     // Export Settings
     const [quality, setQuality] = useState<'high'|'balanced'|'small'>('balanced');
+    const [isQualityMenuOpen, setIsQualityMenuOpen] = useState(false);
     const [isSynthesizing, setIsSynthesizing] = useState(false);
     
     // Preview State
@@ -424,227 +425,261 @@ export const SynthesisDialog: React.FC<SynthesisDialogProps> = ({
 
     return (
         <div 
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
             onMouseUp={handleMouseUp}
             onMouseMove={handleMouseMove}
         >
-            <div className="bg-slate-900 w-[90vw] h-[90vh] rounded-xl border border-slate-700 shadow-2xl flex overflow-hidden">
+            <div 
+                className="bg-[#0a0a0a] w-[95vw] h-[90vh] rounded-2xl border border-white/10 shadow-2xl flex overflow-hidden ring-1 ring-white/5"
+                style={{ WebkitAppRegion: 'no-drag' } as any}
+            >
                 
                 {/* Left: Settings Panel */}
-                <div className="w-[350px] bg-slate-800 p-6 flex flex-col gap-6 overflow-y-auto border-r border-slate-700 z-10 shrink-0">
-                    <h2 className="text-xl font-bold flex items-center gap-2 text-white">
-                        <MonitorPlay size={24} className="text-indigo-400"/> Video Synthesis
-                    </h2>
-                    
-                    {/* Subtitle Settings */}
-                    <div className="space-y-4">
-                        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                            <Type size={14}/> Subtitles
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <label className="text-xs text-slate-500">Size (px)</label>
-                                <input 
-                                    type="number" 
-                                    value={fontSize} 
-                                    onChange={e => setFontSize(Number(e.target.value))}
-                                    className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm text-white"
-                                />
+                <div className="w-[340px] bg-[#161616] flex flex-col border-r border-white/5 z-10 shrink-0">
+                    <div className="p-6 pb-4">
+                        <h2 className="text-xl font-bold flex items-center gap-3 text-white tracking-tight">
+                            <div className="p-2 bg-indigo-500/20 rounded-lg">
+                                <MonitorPlay size={20} className="text-indigo-400"/>
                             </div>
-                            <div className="space-y-1">
-                                <label className="text-xs text-slate-500">Color</label>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="color" 
-                                        value={fontColor}
-                                        onChange={e => setFontColor(e.target.value)}
-                                        className="h-8 w-10 bg-transparent cursor-pointer"
-                                    />
-                                    <span className="text-sm text-slate-300 self-center">{fontColor}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <p className="text-xs text-slate-500 italic">
-                            * Drag the subtitle text in the preview to adjust vertical position.
-                        </p>
+                            Video Synthesis
+                        </h2>
                     </div>
 
-                    <div className="h-[1px] bg-slate-700"></div>
-
-
-                    {/* Output Settings */}
-                    <div className="space-y-4">
-                         <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                            <MonitorPlay size={14}/> Output Settings
-                        </h3>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pt-0 flex flex-col gap-6">
                         
-                        {/* Filename Input */}
-                        <div className="space-y-1">
-                            <label className="text-xs text-slate-500">Filename</label>
-                            <input 
-                                type="text"
-                                value={outputFilename}
-                                onChange={e => setOutputFilename(e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm text-white"
-                                placeholder="video_synthesized.mp4"
-                            />
-                        </div>
-
-                        {/* Folder Selection */}
-                        <div className="space-y-1">
-                            <label className="text-xs text-slate-500">Save to Folder</label>
-                            <div className="flex gap-2">
-                                <input 
-                                    type="text" 
-                                    readOnly
-                                    value={outputDir || ""}
-                                    className="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-400 cursor-not-allowed"
-                                />
-                                <button 
-                                    onClick={handleSelectOutputFolder}
-                                    className="bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded text-xs"
-                                >
-                                    Change
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="h-[1px] bg-slate-700"></div>
-
-                    {/* Watermark Settings */}
-                    <div className="space-y-4">
-                        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                            <ImageIcon size={14}/> Watermark
-                        </h3>
-                        
-                        <input 
-                            type="file" 
-                            accept="image/png,image/jpeg,.psd"
-                            onChange={handleWatermarkSelect}
-                            className="block w-full text-xs text-slate-300
-                              file:mr-4 file:py-2 file:px-4
-                              file:rounded-full file:border-0
-                              file:text-xs file:font-semibold
-                              file:bg-indigo-600 file:text-white
-                              hover:file:bg-indigo-700"
-                        />
-                        {watermarkPreviewUrl && (
-                            <div className="flex items-center gap-2 text-xs text-emerald-400 mt-1">
-                                <span className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center">✓</span>
-                                已加载水印
-                            </div>
-                        )}
-                        
-                        {watermarkPreviewUrl && (
-                            <>
-                                {/* Position Presets */}
-                                <div className="grid grid-cols-3 gap-2 p-2 bg-slate-900/50 rounded-lg border border-slate-700/50">
-                                    <button 
-                                        onClick={() => applyPreset('TL')}
-                                        className="p-2 rounded hover:bg-slate-700 flex justify-center bg-slate-800"
-                                        title="Top Left"
-                                    >
-                                        <div className="w-2 h-2 border-t-2 border-l-2 border-white" />
-                                    </button>
-                                    <button 
-                                        onClick={() => applyPreset('TC')}
-                                        className="p-2 rounded hover:bg-slate-700 flex justify-center bg-slate-800"
-                                        title="Top Center"
-                                    >
-                                        <div className="w-2 h-2 border-t-2 border-white" />
-                                    </button>
-                                    <button 
-                                        onClick={() => applyPreset('TR')}
-                                        className="p-2 rounded hover:bg-slate-700 flex justify-center bg-slate-800"
-                                        title="Top Right"
-                                    >
-                                        <div className="w-2 h-2 border-t-2 border-r-2 border-white" />
-                                    </button>
-
-                                    <button 
-                                        onClick={() => applyPreset('BL')}
-                                        className="p-2 rounded hover:bg-slate-700 flex justify-center bg-slate-800"
-                                        title="Bottom Left"
-                                    >
-                                        <div className="w-2 h-2 border-b-2 border-l-2 border-white" />
-                                    </button>
-                                    <button 
-                                        onClick={() => applyPreset('C')}
-                                        className="p-2 rounded hover:bg-slate-700 flex justify-center bg-slate-800"
-                                        title="Center"
-                                    >
-                                        <div className="w-2 h-2 border-2 border-white rounded-full bg-white/50" />
-                                    </button>
-                                    <button 
-                                        onClick={() => applyPreset('BR')}
-                                        className="p-2 rounded hover:bg-slate-700 flex justify-center bg-slate-800"
-                                        title="Bottom Right"
-                                    >
-                                        <div className="w-2 h-2 border-b-2 border-r-2 border-white" />
-                                    </button>
+                        {/* Subtitle Settings */}
+                        <div className="space-y-3">
+                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                                <Type size={12}/> Subtitles
+                            </h3>
+                            <div className="bg-white/[0.03] border border-white/5 rounded-xl p-4 space-y-4 hover:border-white/10 transition-colors">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Size (px)</label>
+                                        <input 
+                                            type="number" 
+                                            value={fontSize} 
+                                            onChange={e => setFontSize(Number(e.target.value))}
+                                            className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-all font-mono"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Color</label>
+                                        <div className="flex gap-2 items-center h-[38px]">
+                                            <div className="relative overflow-hidden w-full h-full rounded-lg border border-white/10 cursor-pointer group">
+                                                <input 
+                                                    type="color" 
+                                                    value={fontColor}
+                                                    onChange={e => setFontColor(e.target.value)}
+                                                    className="absolute inset-0 w-[150%] h-[150%] -top-1/4 -left-1/4 cursor-pointer p-0 border-0"
+                                                />
+                                            </div>
+                                            <span className="text-xs font-mono text-slate-400">{fontColor}</span>
+                                        </div>
+                                    </div>
                                 </div>
-
-                                <div className="space-y-1">
-                                    <label className="text-xs text-slate-500">Scale ({Math.round(wmScale * 100)}%)</label>
-                                    <input 
-                                        type="range" min="0.05" max="1.0" step="0.05"
-                                        value={wmScale}
-                                        onChange={e => setWmScale(parseFloat(e.target.value))}
-                                        className="w-full accent-indigo-500"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs text-slate-500">Opacity ({Math.round(wmOpacity * 100)}%)</label>
-                                    <input 
-                                        type="range" min="0.1" max="1.0" step="0.1"
-                                        value={wmOpacity}
-                                        onChange={e => setWmOpacity(parseFloat(e.target.value))}
-                                        className="w-full accent-indigo-500"
-                                    />
-                                </div>
-                                <p className="text-xs text-slate-500 italic">
-                                    * Drag the watermark in the preview to reposition.
+                                <p className="text-[10px] text-slate-600 flex items-center gap-1.5 bg-indigo-500/5 p-2 rounded-lg border border-indigo-500/10">
+                                    <MonitorPlay size={10} className="text-indigo-400"/>
+                                    Drag text in preview to adjust position.
                                 </p>
-                            </>
-                        )}
+                            </div>
+                        </div>
+
+                        {/* Output Settings */}
+                        <div className="space-y-3">
+                             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                                <MonitorPlay size={12}/> Output
+                            </h3>
+                            <div className="bg-white/[0.03] border border-white/5 rounded-xl p-4 space-y-4 hover:border-white/10 transition-colors">
+                                {/* Filename Input */}
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Filename</label>
+                                    <input 
+                                        type="text"
+                                        value={outputFilename}
+                                        onChange={e => setOutputFilename(e.target.value)}
+                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-all"
+                                        placeholder="video_synthesized.mp4"
+                                    />
+                                </div>
+
+                                {/* Folder Selection */}
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Save to Folder</label>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            readOnly
+                                            value={outputDir || ""}
+                                            className="flex-1 bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-400 cursor-not-allowed truncate"
+                                        />
+                                        <button 
+                                            onClick={handleSelectOutputFolder}
+                                            className="bg-white/5 hover:bg-white/10 hover:text-white text-slate-400 px-3 py-2 rounded-lg text-xs font-medium border border-white/5 transition-all"
+                                        >
+                                            Change
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Watermark Settings */}
+                        <div className="space-y-3">
+                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                                <ImageIcon size={12}/> Watermark
+                            </h3>
+                            
+                            <div className="bg-white/[0.03] border border-white/5 rounded-xl p-4 space-y-4 hover:border-white/10 transition-colors">
+                                <label className="flex flex-col items-center justify-center w-full h-16 border-2 border-dashed border-white/10 rounded-lg cursor-pointer hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all group">
+                                    <div className="flex flex-col items-center justify-center pt-2 pb-3">
+                                        <p className="text-xs text-slate-400 group-hover:text-indigo-300">
+                                            {watermarkPreviewUrl ? "Replace watermark" : "Upload image"}
+                                        </p>
+                                    </div>
+                                    <input 
+                                        type="file" 
+                                        accept="image/png,image/jpeg,.psd"
+                                        onChange={handleWatermarkSelect}
+                                        className="hidden"
+                                    />
+                                </label>
+
+                                {watermarkPreviewUrl && (
+                                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 px-3 py-2 rounded-lg border border-emerald-500/20">
+                                            <span className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center text-[10px]">✓</span>
+                                            Active
+                                        </div>
+                                        
+                                        {/* Position Grid */}
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Position Preset</label>
+                                            <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-black/20 rounded-lg border border-white/5">
+                                                {['TL', 'TC', 'TR', 'LC', 'C', 'RC', 'BL', 'BC', 'BR'].map(p => (
+                                                    <button 
+                                                        key={p}
+                                                        onClick={() => applyPreset(p as any)}
+                                                        className="p-2 rounded hover:bg-white/10 flex justify-center items-center bg-white/5 aspect-square transition-all active:scale-95 group"
+                                                        title={p}
+                                                    >
+                                                        <div className={`w-1.5 h-1.5 bg-slate-500 group-hover:bg-white rounded-sm transition-colors ${
+                                                            p.includes('C') && p.length===1 ? 'scale-150' : ''
+                                                        }`} />
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <div className="space-y-1.5">
+                                                <div className="flex justify-between">
+                                                    <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Scale</label>
+                                                    <span className="text-[10px] font-mono text-indigo-400">{Math.round(wmScale * 100)}%</span>
+                                                </div>
+                                                <input 
+                                                    type="range" min="0.05" max="1.0" step="0.05"
+                                                    value={wmScale}
+                                                    onChange={e => setWmScale(parseFloat(e.target.value))}
+                                                    className="w-full accent-indigo-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <div className="flex justify-between">
+                                                    <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Opacity</label>
+                                                    <span className="text-[10px] font-mono text-indigo-400">{Math.round(wmOpacity * 100)}%</span>
+                                                </div>
+                                                <input 
+                                                    type="range" min="0.1" max="1.0" step="0.1"
+                                                    value={wmOpacity}
+                                                    onChange={e => setWmOpacity(parseFloat(e.target.value))}
+                                                    className="w-full accent-indigo-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 {/* Right: Preview Area */}
-                <div className="flex-1 flex flex-col bg-black relative min-w-0">
+                <div className="flex-1 flex flex-col bg-[#050505] relative min-w-0">
                     {/* Toolbar */}
-                    <div className="h-12 border-b border-slate-800 flex items-center justify-between px-4 bg-slate-900 shrink-0">
+                    <div className="h-14 border-b border-white/5 flex items-center justify-between px-6 bg-[#1a1a1a] shrink-0">
                         <div className="flex items-center gap-4">
-                            <span className="text-slate-400 text-sm">Preview - Drag elements to move</span>
+                            <span className="text-slate-400 text-xs font-medium bg-white/5 px-2 py-1 rounded border border-white/5">
+                                Preview Mode
+                            </span>
                         </div>
                         <div className="flex items-center gap-4">
-                            <select 
-                                value={quality} 
-                                onChange={e => setQuality(e.target.value as any)}
-                                className="bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded px-2 py-1"
-                            >
-                                <option value="balanced">Balanced (CRF 20)</option>
-                                <option value="high">High Quality (CRF 17)</option>
-                                <option value="small">Low Size (CRF 26)</option>
-                            </select>
-                            <button onClick={onClose} className="p-1 hover:bg-slate-800 rounded-full text-slate-400">
-                                <X size={20} />
+                            {/* Custom Quality Selector */}
+                            <div className="relative">
+                                <button
+                                    onClick={() => setIsQualityMenuOpen(!isQualityMenuOpen)}
+                                    className="flex items-center gap-2 bg-black/20 hover:bg-white/5 border border-white/5 hover:border-white/10 rounded-lg pl-3 pr-2 py-1.5 transition-all outline-none focus:ring-1 focus:ring-indigo-500/50 group"
+                                >
+                                    <div className="flex flex-col items-start gap-0.5">
+                                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider leading-none">Quality</span>
+                                        <span className="text-xs text-slate-200 font-medium leading-none group-hover:text-white transition-colors">
+                                            {quality === 'high' ? 'High Quality' : quality === 'balanced' ? 'Balanced' : 'Low Size'}
+                                        </span>
+                                    </div>
+                                    <ChevronDown size={14} className={`text-slate-500 transition-transform duration-200 ${isQualityMenuOpen ? 'rotate-180' : ''}`} />
+                                </button>
+
+                                {isQualityMenuOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setIsQualityMenuOpen(false)} />
+                                        <div className="absolute top-full mt-2 right-0 w-56 bg-[#161616] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1 ring-1 ring-black/50 animate-in fade-in zoom-in-95 duration-100">
+                                            {[
+                                                { id: 'high', label: 'High Quality', desc: 'CRF 17 (Visually Lossless)' },
+                                                { id: 'balanced', label: 'Balanced', desc: 'CRF 20 (Recommended)' },
+                                                { id: 'small', label: 'Small Size', desc: 'CRF 26 (Compressed)' }
+                                            ].map(opt => (
+                                                <button
+                                                    key={opt.id}
+                                                    onClick={() => {
+                                                        setQuality(opt.id as any);
+                                                        setIsQualityMenuOpen(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-2.5 flex items-start gap-3 hover:bg-white/5 transition-colors ${quality === opt.id ? 'bg-indigo-500/10' : ''}`}
+                                                >
+                                                    <div className={`mt-0.5 w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                                                        quality === opt.id ? 'border-indigo-500 bg-indigo-500' : 'border-slate-600'
+                                                    }`}>
+                                                        {quality === opt.id && <div className="w-1 h-1 bg-white rounded-full" />}
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className={`text-xs font-medium ${quality === opt.id ? 'text-indigo-300' : 'text-slate-200'}`}>
+                                                            {opt.label}
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-500">
+                                                            {opt.desc}
+                                                        </span>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            <div className="h-4 w-[1px] bg-white/10" />
+                            <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-all">
+                                <X size={18} />
                             </button>
                         </div>
                     </div>
                     
                     {/* Output Preview Container */}
-                    <div className="flex-1 relative flex items-center justify-center bg-black/50 overflow-hidden p-4">
+                    <div className="flex-1 relative flex items-center justify-center bg-[url('/grid.svg')] bg-repeat opacity-100 overflow-hidden p-8">
                         {/* The Video Container that matches aspect ratio */}
                         <div 
                             ref={containerRef}
-                            className="relative shadow-2xl border border-slate-800/50 bg-black"
+                            className="relative shadow-2xl shadow-black/50 border border-white/10 bg-black rounded-lg overflow-hidden ring-1 ring-white/5"
                             style={{
-                                // We rely on the video to set the size of this container naturally (inline-block behavior ish)
-                                // But to ensuring overlay is 1:1, we just wrap the video tightly.
-                                // React requires us to handle this carefully to avoid 0x0.
-                                // We use max-width/height to constrain within parent, and aspect ratio from metadata.
                                 width: videoSize.w ? undefined : '100%',
                                 height: videoSize.w ? undefined : '100%',
                                 aspectRatio: videoSize.w ? `${videoSize.w}/${videoSize.h}` : undefined,
@@ -658,15 +693,16 @@ export const SynthesisDialog: React.FC<SynthesisDialogProps> = ({
                                     src={mediaUrl}
                                     className="w-full h-full object-contain block"
                                     onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                                    // Fix: onTimeUpdate runs frequently, we use wrapper handler
                                     onLoadedMetadata={(e) => {
                                         const t = e.currentTarget;
                                         setVideoSize({ w: t.videoWidth, h: t.videoHeight });
                                     }}
                                 />
                             ) : (
-                                <div className="flex flex-col items-center justify-center h-full w-full text-slate-500 bg-slate-900/50 aspect-video">
-                                    <Play size={48} className="opacity-20 mb-2"/>
-                                    No Media
+                                <div className="flex flex-col items-center justify-center h-full w-full text-slate-600 bg-white/[0.02]">
+                                    <Play size={48} className="opacity-20 mb-4"/>
+                                    <span className="text-sm font-medium">No Media Loaded</span>
                                 </div>
                             )}
 
@@ -684,87 +720,94 @@ export const SynthesisDialog: React.FC<SynthesisDialogProps> = ({
                                         zIndex: 20,
                                         transform: 'translate(-50%, -50%)', // Center anchor
                                         border: dragging === 'wm' ? '1px dashed #6366f1' : '1px dashed transparent',
+                                        boxShadow: dragging === 'wm' ? '0 0 0 1000px rgba(0,0,0,0.5)' : 'none' // Focus effect
                                     }}
                                     onMouseDown={(e) => handleDragStart(e, 'wm')}
                                 >
                                     <img 
                                         src={watermarkPreviewUrl} 
-                                        className="w-full h-auto pointer-events-none"
+                                        className="w-full h-auto pointer-events-none drop-shadow-lg"
                                         alt="Watermark"
                                     />
                                     {/* Hover Guide */}
-                                    <div className="absolute inset-0 border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none rounded"></div>
+                                    <div className="absolute inset-0 border border-indigo-500/50 opacity-0 group-hover:opacity-100 pointer-events-none rounded transition-opacity"></div>
                                 </div>
                             )}
                             
                             {/* Subtitle Overlay */}
-                            {/* We render a box for the subtitle area */}
                             <div 
-                                className="absolute left-0 right-0 text-center cursor-move select-none group hover:bg-indigo-500/10 transition-colors"
+                                className="absolute left-0 right-0 text-center cursor-move select-none group transition-colors px-6"
                                 style={{ 
                                     top: `${subPos.y * 100}%`,
-                                    transform: 'translateY(-50%)', // Center vertically on the Y point
+                                    transform: 'translateY(-50%)',
                                     zIndex: 30,
-                                    border: dragging === 'sub' ? '1px dashed #6366f1' : '1px dashed transparent',
                                 }}
                                 onMouseDown={(e) => handleDragStart(e, 'sub')}
                             >
-                                <span 
-                                    style={{ 
-                                        fontSize: `${fontSize}px`, 
-                                        color: fontColor,
-                                        textShadow: '1px 1px 2px black, 0 0 1em black',
-                                        fontFamily: 'sans-serif',
-                                        padding: '4px 8px',
-                                        backgroundColor: 'rgba(0,0,0,0.5)',
-                                        display: 'inline-block',
-                                        pointerEvents: 'none' // Click passes to div
-                                    }}
-                                >
-                                    {currentSubtitle}
-                                    {/* Show placeholder if empty only if drag is active? Or always invisible? User asked for empty. */}
-                                    {!currentSubtitle && dragging === 'sub' && <span className="opacity-50 text-xs">(Subtitle Position)</span>}
-                                </span>
+                                {(currentSubtitle || dragging === 'sub') && (
+                                    <span 
+                                        className={`
+                                            inline-block bg-black/60 text-white/95 px-6 py-3 rounded-xl text-lg md:text-xl font-medium shadow-lg backdrop-blur-md border border-white/10 leading-relaxed max-w-full break-words
+                                            transition-all duration-75
+                                            ${dragging === 'sub' ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-black/50' : 'group-hover:ring-1 group-hover:ring-white/30'}
+                                        `}
+                                        style={{ 
+                                            fontSize: `${fontSize}px`, 
+                                            color: fontColor,
+                                            fontFamily: 'sans-serif'
+                                        }}
+                                    >
+                                        {currentSubtitle || "(Subtitle Position)"}
+                                    </span>
+                                )}
                             </div>
-
                         </div>
                     </div>
                     
-                    {/* Time Seeker */}
-                    <div className="h-12 bg-slate-900 border-t border-slate-800 px-4 flex items-center gap-4 shrink-0">
+                    {/* Time Seeker & Action Bar */}
+                    <div className="h-16 bg-[#1a1a1a] border-t border-white/5 px-6 flex items-center gap-6 shrink-0 relative z-20">
                         <button 
                             onClick={() => {
                                 if (videoRef.current?.paused) videoRef.current.play();
                                 else videoRef.current?.pause();
                             }}
-                            className="p-2 hover:bg-slate-800 rounded-full text-slate-200"
+                            className="w-10 h-10 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-full text-slate-200 border border-white/5 hover:border-white/20 transition-all active:scale-95"
                         >
-                            <Play size={16} fill="currentColor"/>
+                            <Play size={18} fill="currentColor" className="ml-0.5"/>
                         </button>
                         
-                        <input 
-                            type="range"
-                            min="0"
-                            max={videoRef.current?.duration || 100}
-                            value={currentTime}
-                            onChange={(e) => {
-                                const t = Number(e.target.value);
-                                setCurrentTime(t);
-                                if (videoRef.current) videoRef.current.currentTime = t;
-                            }}
-                            className="flex-1 accent-indigo-500"
-                        />
-                        <span className="text-xs text-slate-500 font-mono w-16 text-right">
-                            {currentTime.toFixed(1)}s
-                        </span>
+                        <div className="flex-1 flex flex-col justify-center gap-1.5 pt-1">
+                             <input 
+                                type="range"
+                                min="0"
+                                max={videoRef.current?.duration || 100}
+                                value={currentTime}
+                                onChange={(e) => {
+                                    const t = Number(e.target.value);
+                                    setCurrentTime(t);
+                                    if (videoRef.current) videoRef.current.currentTime = t;
+                                }}
+                                className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400"
+                            />
+                            <div className="flex justify-between px-0.5">
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                    {currentTime.toFixed(1)}s
+                                </span>
+                                <span className="text-[10px] text-slate-600 font-mono">
+                                    {videoRef.current?.duration?.toFixed(1) || '--'}s
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div className="h-8 w-[1px] bg-white/5 mx-2" />
                         
                         <button 
                             onClick={handleSynthesize}
                             disabled={isSynthesizing}
-                            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-4 py-1.5 rounded text-sm font-medium flex items-center gap-2"
+                            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all active:scale-95"
                         >
-                            {isSynthesizing ? <Settings2 className="animate-spin" size={16}/> : <Download size={16}/>}
-                            Start Render
+                            {isSynthesizing ? <Settings2 className="animate-spin" size={18}/> : <Download size={18}/>}
+                            <span>Start Render</span>
                         </button>
                     </div>
                 </div>

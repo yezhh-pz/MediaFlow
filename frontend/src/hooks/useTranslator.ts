@@ -50,9 +50,11 @@ export const useTranslator = (): UseTranslatorReturn => {
     targetLang,
     mode,
     taskId,
-    taskStatus,
     progress,
-    isTranslating,
+    // Fix: isTranslating is a function in store, we need to call it to get the boolean
+    // But destructuring a function doesn't make it reactive if it depends on state.
+    // Better way: use selector or just use taskStatus directly in hook
+    taskStatus,
 
     setSourceSegments,
     setTargetSegments,
@@ -213,29 +215,56 @@ export const useTranslator = (): UseTranslatorReturn => {
     const interval = setInterval(async () => {
       try {
         const statusRes = await translatorService.getTaskStatus(tid);
-        setTaskStatus(statusRes.status);
 
         if (statusRes.progress) setProgress(statusRes.progress);
 
         if (statusRes.status === "completed") {
           clearInterval(interval);
-          if (statusRes.result && statusRes.result.segments) {
-            setTargetSegments(statusRes.result.segments);
+
+          // Fix: Segments are inside result.meta, not result root
+          // Also handle legacy structure if present
+          const segments =
+            statusRes.result?.meta?.segments || statusRes.result?.segments;
+
+          // Buffer rendering: show spinner until data is populated
+          setTaskStatus("processing_result");
+
+          if (segments && segments.length > 0) {
+            setTargetSegments(segments);
+          } else {
+            console.warn(
+              "Translation completed but no segments found:",
+              statusRes,
+            );
+            alert("Translation finished but returned no segments.");
           }
+
+          // Small delay to ensure React renders the list before stopping spinner
+          setTimeout(() => {
+            setTaskStatus("completed");
+          }, 600);
+
           if (
             statusRes.result &&
-            statusRes.result.srt_path &&
+            // Check correct path: files list or meta
+            (statusRes.result.files?.length > 0 ||
+              statusRes.result.meta?.srt_path) &&
             window.electronAPI
           ) {
             // Auto-open logic (commented out in original)
           }
         } else if (statusRes.status === "failed") {
           clearInterval(interval);
+          setTaskStatus("failed");
           alert("Translation failed: " + statusRes.error);
+        } else {
+          // Only update status if running/pending
+          setTaskStatus(statusRes.status);
         }
       } catch (e) {
-        console.error("Polling error:", e);
-        clearInterval(interval);
+        console.error("Polling error (will keep retrying):", e);
+        // Do NOT stop polling on transient errors!
+        // clearInterval(interval);
       }
     }, 1000);
   };
@@ -253,22 +282,50 @@ export const useTranslator = (): UseTranslatorReturn => {
       Russian: "_RU",
     };
     const suffix = LANG_SUFFIX_MAP[targetLang] || "_CN";
-    const savePath = sourceFilePath.replace(/(\.[^.]+)$/, `${suffix}.srt`);
 
-    // Build SRT content
-    let srtContent = "";
-    targetSegments.forEach((seg, index) => {
-      const startStr = formatTimestamp(seg.start);
-      const endStr = formatTimestamp(seg.end);
-      srtContent += `${index + 1}\n${startStr} --> ${endStr}\n${seg.text}\n\n`;
-    });
+    let defaultPath = sourceFilePath;
+    const lastDotIndex = defaultPath.lastIndexOf(".");
+    const lastSepIndex = Math.max(
+      defaultPath.lastIndexOf("/"),
+      defaultPath.lastIndexOf("\\"),
+    );
+
+    // Only strip if dot is part of the filename (after the last separator)
+    if (lastDotIndex > lastSepIndex) {
+      defaultPath = defaultPath.substring(0, lastDotIndex);
+    }
+
+    defaultPath += `${suffix}.srt`;
 
     try {
-      await window.electronAPI.saveFile(savePath, srtContent);
-      alert(`Saved to ${savePath}`);
+      const savePath = await window.electronAPI.showSaveDialog({
+        defaultPath: defaultPath,
+        filters: [
+          { name: "Subtitles", extensions: ["srt"] },
+          { name: "Text", extensions: ["txt"] },
+        ],
+      });
+
+      if (!savePath) return; // User canceled
+
+      let content = "";
+      if (savePath.toLowerCase().endsWith(".txt")) {
+        // Plain text format
+        content = targetSegments.map((seg) => seg.text).join("\n");
+      } else {
+        // SRT format (Default)
+        targetSegments.forEach((seg, index) => {
+          const startStr = formatTimestamp(seg.start);
+          const endStr = formatTimestamp(seg.end);
+          content += `${index + 1}\n${startStr} --> ${endStr}\n${seg.text}\n\n`;
+        });
+      }
+
+      await window.electronAPI.saveFile(savePath, content);
+      // alert(`Saved to ${savePath}`); // Feedback is good but maybe toast? Alert is fine for now.
     } catch (e) {
       console.error(e);
-      alert("Failed to save file");
+      alert("Failed to save file: " + e);
     }
   };
 
@@ -282,8 +339,9 @@ export const useTranslator = (): UseTranslatorReturn => {
   };
 
   return {
-    sourceSegments,
-    targetSegments,
+    // Ensure arrays are never undefined even if local storage is corrupt
+    sourceSegments: sourceSegments || [],
+    targetSegments: targetSegments || [],
     glossary,
     sourceFilePath,
     targetLang,
@@ -291,7 +349,11 @@ export const useTranslator = (): UseTranslatorReturn => {
     taskId,
     taskStatus,
     progress,
-    isTranslating: isTranslating(),
+    isTranslating:
+      taskStatus === "translating" ||
+      taskStatus === "starting" ||
+      taskStatus === "processing_result" ||
+      taskStatus === "running",
     setSourceSegments,
     updateTargetSegment,
     setTargetLang,

@@ -35,11 +35,12 @@ export function Layout({ children }: LayoutProps) {
             right: 0, 
             width: '120px',
             height: '40px',
-            zIndex: 60,
+            zIndex: 10000,
             display: 'flex',
             justifyContent: 'flex-end',
             alignItems: 'center',
             WebkitAppRegion: 'no-drag',
+            pointerEvents: 'none', 
           } as any}
         >
              <WindowControls />

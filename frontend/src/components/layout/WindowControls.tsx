@@ -14,7 +14,7 @@ export function WindowControls() {
   };
 
   return (
-    <div className="flex items-center">
+    <div className="flex items-center pointer-events-auto">
       <button
         onClick={handleMinimize}
         className="p-2 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"

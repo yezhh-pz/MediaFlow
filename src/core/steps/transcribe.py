@@ -56,9 +56,15 @@ class TranscribeStep(PipelineStep):
             )
         )
         
-        ctx.set("transcript", result.text)
-        ctx.set("segments", result.segments)
-        logger.success(f"Step Transcribe finished. Text len: {len(result.text)}")
+        if not result.success:
+            raise Exception(result.error or "Transcription failed")
+
+        text = result.meta.get("text", "")
+        segments = result.meta.get("segments", [])
+
+        ctx.set("transcript", text)
+        ctx.set("segments", segments)
+        logger.success(f"Step Transcribe finished. Text len: {len(text)}")
 
 
 # Register at module level

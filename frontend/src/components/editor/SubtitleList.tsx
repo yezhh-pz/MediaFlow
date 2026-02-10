@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import type { SubtitleSegment } from '../../types/task';
-import { Trash2, AlertCircle, Wand2 } from 'lucide-react';
+import { Trash2, Wand2 } from 'lucide-react';
 import { validateSegment, fixOverlaps } from '../../utils/validation';
 
 interface SubtitleListProps {
@@ -75,22 +75,23 @@ const SubtitleListComponent: React.FC<SubtitleListProps> = (props) => {
     };
 
     return (
-        <div className="flex flex-col h-full bg-slate-800 border-r border-slate-700">
+        <div className="flex flex-col h-full bg-[#1a1a1a] border-r border-white/5 relative">
              {/* Toolbar */}
-             <div className="p-2 border-b border-slate-700 flex gap-2 bg-slate-800 shrink-0">
+             <div className="p-2 border-b border-white/5 flex gap-2 bg-[#1a1a1a] shrink-0 z-20">
                 <button 
                   disabled={selectedIds.length < 2 || !isContinuous}
                   title={!isContinuous && selectedIds.length >= 2 ? "Can only merge adjacent segments" : "Merge selected subtitles"}
                   onClick={handleMerge}
-                  className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-xs rounded text-white transition-colors"
+                  className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed text-indigo-300 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5"
                 >
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
                     Merge Selected ({selectedIds.length})
                 </button>
                 
                 {onAutoFix && hasOverlaps && (
                     <button
                         onClick={handleAutoFix}
-                        className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-xs rounded text-white transition-colors flex items-center gap-1"
+                        className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-300 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 animate-pulse"
                         title="Auto-fix overlapping subtitles"
                     >
                         <Wand2 size={12} /> Auto-fix Overlaps
@@ -99,16 +100,19 @@ const SubtitleListComponent: React.FC<SubtitleListProps> = (props) => {
              </div>
 
              {/* Header */}
-             <div className="flex bg-slate-900 border-b border-slate-700 text-xs uppercase text-slate-400 font-medium shadow-sm shrink-0">
-                  <div className="w-10 text-center py-2">#</div>
-                  <div className="flex-1 py-2 px-2">Subtitle Text</div>
-                  <div className="w-8 py-2"></div>
+             <div className="flex bg-[#161616] border-b border-white/5 text-[10px] uppercase tracking-wider text-slate-500 font-bold shadow-sm shrink-0 sticky top-0 z-10">
+                  <div className="w-14 text-center py-1.5 border-r border-white/5">Start</div>
+                  <div className="flex-1 py-1.5 px-3">Subtitle Text</div>
+                  <div className="w-8 py-1.5"></div>
              </div>
 
             {/* Native List Container */}
-            <div ref={containerRef} className="flex-1 min-h-0 w-full overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-700">
+            <div ref={containerRef} className="flex-1 min-h-0 w-full overflow-y-auto custom-scrollbar bg-[#0a0a0a]">
                 {segments.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-slate-600 text-sm">
+                    <div className="flex flex-col items-center justify-center h-full text-slate-600/50 text-sm gap-2">
+                         <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
+                            <span className="text-2xl opacity-20">T</span>
+                         </div>
                         <p>No subtitles</p>
                     </div>
                 ) : (
@@ -121,8 +125,6 @@ const SubtitleListComponent: React.FC<SubtitleListProps> = (props) => {
                         const issues = validateSegment(seg);
                         
                         // Overlap Check (using previous segment if sorted)
-                        // Note: segments are typically sorted by ID/Start.
-                        // We check if current.start < previous.end
                         if (index > 0) {
                             const prev = segments[index - 1];
                             if (seg.start < prev.end - 0.05) { // 0.05s tolerance
@@ -135,7 +137,6 @@ const SubtitleListComponent: React.FC<SubtitleListProps> = (props) => {
                         }
                         const hasError = issues.some(i => i.type === 'error');
                         const hasWarning = issues.some(i => i.type === 'warning');
-                        const issueColor = hasError ? 'text-red-400' : (hasWarning ? 'text-yellow-400' : '');
                         const validationTooltip = issues.map(i => `[${i.type.toUpperCase()}] ${i.message}`).join('\n');
 
                         return (
@@ -143,36 +144,47 @@ const SubtitleListComponent: React.FC<SubtitleListProps> = (props) => {
                                 key={seg.id}
                                 ref={(el) => { itemRefs.current[idStr] = el; }}
                                 className={`
-                                    group flex items-start border-b border-slate-800 transition-colors cursor-pointer border-l-4
-                                    ${isActive ? 'bg-indigo-900/40 border-l-indigo-500' : 'border-l-transparent hover:bg-slate-800/50'}
-                                    ${isSelected && !isActive ? 'bg-indigo-900/60' : ''}
+                                    group flex items-center border-b border-white/5 transition-all cursor-pointer relative
+                                    ${isActive ? 'bg-indigo-500/10' : 'hover:bg-white/[0.02]'}
+                                    ${isSelected && !isActive ? 'bg-indigo-900/40 border-l-2 border-indigo-500/50' : ''}
+                                    ${(hasError || hasWarning) && !isActive && !isSelected ? 'bg-yellow-500/5' : ''}
                                 `}
                                 onClick={(e) => onSegmentClick(idStr, e.ctrlKey || e.metaKey, e.shiftKey)}
                                 onDoubleClick={() => onSegmentDoubleClick(idStr)}
                                 onContextMenu={(e) => onContextMenu(e, idStr)}
                             >
-                                {/* Index */}
-                                <div className={`w-10 text-center py-2 font-mono text-xs select-none flex flex-col items-center gap-1 shrink-0 text-slate-500`}>
-                                    {index + 1}
-                                    {(hasError || hasWarning) && (
-                                        <div title={validationTooltip} className={issueColor}>
-                                            <AlertCircle size={10} />
-                                        </div>
-                                    )}
+                                {/* Active Indicator Bar */}
+                                {isActive && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]" />}
+
+                                {/* Timestamp & Status */}
+                                <div 
+                                    className={`w-14 text-center py-2 font-mono text-[10px] select-none flex flex-col items-center justify-center shrink-0 border-r border-white/5 h-full min-h-[2rem]
+                                        ${isActive ? 'text-indigo-300' : 'text-slate-500'}
+                                        ${(hasError || hasWarning) ? 'bg-amber-500/10 text-amber-500' : ''}
+                                    `}
+                                    title={validationTooltip}
+                                >
+                                    {(() => {
+                                        const mins = Math.floor(seg.start / 60);
+                                        const secs = Math.floor(seg.start % 60);
+                                        const ms = Math.floor((seg.start % 1) * 100);
+                                        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+                                    })()}
                                 </div>
                                 
                                 {/* Text */}
-                                <div className="flex-1 py-1 px-2 select-none min-w-0">
-                                    <div className={`break-words leading-tight text-sm font-medium ${!seg.text ? 'text-slate-600 italic' : 'text-slate-200'}`}>
+                                <div className="flex-1 py-1 px-3 select-none min-w-0 flex items-center h-full">
+                                    <div className={`text-sm truncate w-full ${!seg.text ? 'text-slate-600 italic' : isActive ? 'text-white font-medium' : 'text-slate-300'}`}>
                                         {seg.text || "Empty segment"}
                                     </div>
                                 </div>
                                 
                                 {/* Actions */}
-                                <div className="w-8 pr-1 py-1 flex justify-end shrink-0">
+                                <div className="w-8 pr-1 flex justify-end shrink-0 opacity-0 group-hover:opacity-100 transition-all">
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); onSegmentDelete(idStr); }}
-                                        className="p-1 hover:bg-red-500/20 rounded text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                                        className="p-1 hover:bg-red-500/10 rounded-md text-slate-600 hover:text-red-400 transition-colors"
+                                        title="Delete Segment"
                                     >
                                         <Trash2 size={12} />
                                     </button>

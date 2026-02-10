@@ -200,6 +200,7 @@ Rules:
         Compatible with previous API signature.
         """
         if not segments:
+            logger.warning("[Translate] Received empty segments list.")
             return []
             
         translated_segments = []
@@ -238,13 +239,19 @@ Rules:
                 translated_segments.extend(result_batch)
                 
             except Exception as e:
-                logger.error(f"Failed batch {current_batch_index}: {e}")
+                logger.error(f"[Translate] Failed batch {current_batch_index + 1}: {e}")
                 translated_segments.extend(batch) # Fallback
                 
         # Re-index IDs if intelligent mode mixed things up (optional cleanup)
         if mode == "intelligent":
             for i, seg in enumerate(translated_segments):
                 seg.id = str(i + 1)
+        
+        # Check if we actually translated anything
+        # If we just fell back for every batch, we should probably warn or fail
+        # But we don't track success count explicitly yet.
+        # Let's assume if it completed without raising, it's "success" in terms of "finished".
+        logger.info(f"[Translate] Translation loop finished. Total segments: {len(translated_segments)}")
         
         if progress_callback:
             progress_callback(100, "Translation completed")

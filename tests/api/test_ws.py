@@ -40,11 +40,11 @@ async def test_task_update_broadcast():
     mock_ws = MockWS()
     await task_manager.connect(mock_ws)
     
-    from src.services.task_manager import TaskInfo
+    from src.models.task_model import Task
     import time
     
-    # Create a real TaskInfo object
-    task_manager.tasks["test_task"] = TaskInfo(
+    # Create a real Task object
+    task_manager.tasks["test_task"] = Task(
         id="test_task", 
         type="test", 
         status="pending", 

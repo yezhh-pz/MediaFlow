@@ -1,4 +1,4 @@
-import { Upload, FileVideo } from 'lucide-react';
+import { Upload, FileVideo, FileText } from 'lucide-react';
 import { useRef } from 'react';
 
 interface FileUploaderProps {
@@ -35,11 +35,21 @@ export const FileUploader = ({ onFileSelect, currentFile }: FileUploaderProps) =
 
     return (
         <div 
-            className="border-2 border-dashed border-zinc-700 rounded-lg p-8 text-center hover:border-zinc-500 transition-colors cursor-pointer bg-zinc-900/50"
+            onClick={handleClick}
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
-            onClick={handleClick}
+            className={`group relative border border-dashed rounded-2xl p-8 flex flex-col items-center justify-center gap-4 transition-all duration-300 cursor-pointer overflow-hidden
+                ${currentFile 
+                ? 'border-indigo-500/50 bg-indigo-500/5 shadow-[0_0_20px_-5px_rgba(99,102,241,0.15)]' 
+                : 'border-white/10 bg-black/20 hover:border-indigo-500/30 hover:bg-black/30'
+                }
+            `}
         >
+             {/* Background Pattern */}
+            <div className={`absolute inset-0 opacity-[0.03] pointer-events-none transition-opacity duration-500 ${currentFile ? 'opacity-[0.08]' : 'group-hover:opacity-[0.06]'}`}
+                style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '16px 16px' }}
+            />
+
             <input 
                 type="file" 
                 ref={fileInputRef} 
@@ -49,17 +59,37 @@ export const FileUploader = ({ onFileSelect, currentFile }: FileUploaderProps) =
             />
             
             {currentFile ? (
-                <div className="flex flex-col items-center gap-2 text-zinc-300">
-                     <FileVideo className="w-8 h-8 text-blue-400" />
-                     <p className="font-medium truncate max-w-md">{currentFile}</p>
-                     <p className="text-xs text-zinc-500">Click or Drag to replace</p>
-                </div>
+                <>
+                    <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shadow-inner group-hover:scale-105 transition-transform duration-300">
+                        {currentFile.endsWith('.srt') || currentFile.endsWith('.vtt') ? (
+                            <FileText className="w-8 h-8 text-indigo-400" />
+                        ) : (
+                            <FileVideo className="w-8 h-8 text-indigo-400" />
+                        )}
+                    </div>
+                    <div className="text-center z-10">
+                        <p className="font-semibold text-white mb-1.5 truncate max-w-md">{currentFile.split(/[/\\]/).pop()}</p>
+                        <div className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                            Ready to Translate
+                        </div>
+                    </div>
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); handleClick(); }}
+                        className="px-4 py-2 text-xs font-medium bg-white/5 hover:bg-white/10 border border-white/5 rounded-lg text-slate-300 hover:text-white transition-all z-10"
+                    >
+                        Replace File
+                    </button>
+                </>
             ) : (
-                <div className="flex flex-col items-center gap-2 text-zinc-400">
-                    <Upload className="w-8 h-8" />
-                    <p className="font-medium">Drag & Drop Video/SRT here</p>
-                    <p className="text-xs text-zinc-500">Support .srt, .mp4, .mp3, .wav</p>
-                </div>
+                <>
+                    <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center border border-white/5 group-hover:bg-indigo-500/10 group-hover:border-indigo-500/20 transition-colors duration-300">
+                        <Upload className="w-8 h-8 text-slate-500 group-hover:text-indigo-400 transition-colors duration-300" />
+                    </div>
+                    <div className="text-center z-10">
+                        <p className="text-slate-300 font-medium mb-1 group-hover:text-white transition-colors">Drag & drop Video or Subtitle</p>
+                        <p className="text-xs text-slate-500">Supports .srt, .mp4, .mp3, .wav</p>
+                    </div>
+                </>
             )}
         </div>
     );

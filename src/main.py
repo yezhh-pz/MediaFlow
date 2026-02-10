@@ -11,6 +11,7 @@ async def lifespan(app: FastAPI):
     # === Service Registration ===
     from src.core.container import container, Services
     from src.services.task_manager import TaskManager
+    
     from src.services.asr import ASRService
     from src.services.downloader import DownloaderService
     from src.services.browser_service import BrowserService
@@ -40,6 +41,11 @@ async def lifespan(app: FastAPI):
     logger.info(f"Directories initialized at {settings.BASE_DIR}")
     logger.info(f"Registered {len(container._factories)} services")
     
+    # Initialize Database & Load Tasks
+    if container.has(Services.TASK_MANAGER):
+        tm = container.get(Services.TASK_MANAGER)
+        await tm.init_async()
+
     yield
     
     # === Shutdown Logic ===

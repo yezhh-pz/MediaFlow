@@ -146,7 +146,7 @@ ipcMain.handle("dialog:selectDirectory", async () => {
   } else {
     const dirPath = filePaths[0];
     lastOpenDir = dirPath;
-    saveLastOpenDir(lastOpenDir);
+    saveLastOpenDir(dirPath);
     return dirPath;
   }
 });

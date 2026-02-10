@@ -1,6 +1,7 @@
 
 import asyncio
 import json
+import websockets
 import time
 import sys
 from pathlib import Path
@@ -8,7 +9,8 @@ from pathlib import Path
 # Add project root to sys.path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from src.services.task_manager import task_manager, TaskInfo
+from src.services.task_manager import TaskManager
+from src.models.task_model import Task
 
 async def recreate_bug():
     print("Loading tasks...")

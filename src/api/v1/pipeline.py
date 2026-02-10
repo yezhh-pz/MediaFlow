@@ -25,7 +25,7 @@ async def run_pipeline(req: PipelineRequest, background_tasks: BackgroundTasks):
         tm = _get_task_manager()
         
         # 1. Deduplication Check
-        existing_task_id = tm.find_task_by_params("pipeline", req.dict())
+        existing_task_id = tm.find_task_by_params("pipeline", req.model_dump(mode='json'))
         
         if existing_task_id:
             task = tm.get_task(existing_task_id)
@@ -60,11 +60,15 @@ async def run_pipeline(req: PipelineRequest, background_tasks: BackgroundTasks):
         if len(req.steps) == 1 and req.steps[0].step_name == "download":
             task_type = "download"
 
+        params = req.model_dump(mode='json')
         logger.info(f"Pipeline Request: task_name={req.task_name}, steps={len(req.steps)}, type={task_type}")
+        logger.debug(f"DEBUG PIPELINE PARAMS TYPE: {type(params)}")
+        logger.debug(f"DEBUG PIPELINE PARAMS CONTENT: {params}")
+
         task_id = await tm.create_task(
             task_type, 
             "Queued", 
-            request_params=req.dict(), 
+            request_params=req.model_dump(mode='json'), 
             task_name=req.task_name
         )
         

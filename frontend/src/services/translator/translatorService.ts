@@ -66,7 +66,7 @@ export const translatorService = {
   },
 
   // Polling helper
-  getTaskStatus: async (taskId: string) => {
+  getTaskStatus: async (taskId: string): Promise<any> => {
     const res = await fetch(`${API_BASE}/tasks/${taskId}`);
     if (!res.ok) throw new Error("Failed to get task status");
     return await res.json();

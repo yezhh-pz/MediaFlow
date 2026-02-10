@@ -61,3 +61,13 @@
 .wavesurfer-wrapper *::part(scroll)::-webkit-scrollbar-thumb:hover {
   background: #6b7280; /* slate-500 */
 }
+
+/* Electron Drag Regions */
+.drag-region {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}

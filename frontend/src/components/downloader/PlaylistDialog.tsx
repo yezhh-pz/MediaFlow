@@ -1,5 +1,5 @@
 import React from "react";
-import { List, X } from "lucide-react";
+import { List, X, CheckSquare, Square } from "lucide-react";
 import type { AnalyzeResult } from "../../api/client";
 
 interface PlaylistDialogProps {
@@ -24,122 +24,93 @@ export function PlaylistDialog({
   onToggleItem,
 }: PlaylistDialogProps) {
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: "rgba(0,0,0,0.8)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-      }}
-    >
-      <div
-        style={{
-          background: "#1e1e1e",
-          borderRadius: 12,
-          padding: 24,
-          maxWidth: 600,
-          width: "90%",
-          maxHeight: "80vh",
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 16,
-          }}
-        >
-          <h2 style={{ margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
-            <List size={24} color="#4F46E5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+      <div 
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" 
+        onClick={onClose}
+      />
+      
+      <div className="relative w-full max-w-2xl bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200">
+        {/* Header */}
+        <div className="flex-none p-5 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+          <h2 className="text-lg font-semibold text-white flex items-center gap-3">
+            <div className="p-2 bg-indigo-500/10 rounded-lg">
+              <List size={20} className="text-indigo-400" />
+            </div>
             Playlist Detected
           </h2>
           <button
             onClick={onClose}
-            style={{ background: "transparent", border: "none", cursor: "pointer" }}
+            className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors"
           >
-            <X size={24} color="#888" />
+            <X size={20} />
           </button>
         </div>
 
-        <p style={{ color: "#888", margin: "0 0 16px 0" }}>
-          <strong>{playlistInfo.title}</strong> contains{" "}
-          <strong>{playlistInfo.count}</strong> videos.
-        </p>
+        {/* Content */}
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          <div className="p-5 flex-none">
+            <p className="text-slate-400 text-sm mb-4">
+              <strong className="text-white">{playlistInfo.title}</strong> contains{" "}
+              <strong className="text-white">{playlistInfo.count}</strong> videos.
+            </p>
 
-        <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-          <button
-            onClick={onSelectAll}
-            style={{ background: "#333", border: "1px solid #555", padding: "6px 12px", fontSize: "0.85em" }}
-          >
-            Select All
-          </button>
-          <button
-            onClick={onClearSelection}
-            style={{ background: "#333", border: "1px solid #555", padding: "6px 12px", fontSize: "0.85em" }}
-          >
-            Clear Selection
-          </button>
+            <div className="flex gap-2">
+              <button
+                onClick={onSelectAll}
+                className="px-3 py-1.5 bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 rounded-lg text-xs font-medium text-slate-300 hover:text-white transition-colors"
+              >
+                Select All
+              </button>
+              <button
+                onClick={onClearSelection}
+                className="px-3 py-1.5 bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 rounded-lg text-xs font-medium text-slate-300 hover:text-white transition-colors"
+              >
+                Clear Selection
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto custom-scrollbar px-5 pb-5">
+            <div className="border border-white/5 rounded-xl bg-black/20 divide-y divide-white/5">
+              {playlistInfo.items?.map((item, index) => {
+                const isSelected = selectedItems.includes(index);
+                return (
+                  <div
+                    key={index}
+                    onClick={() => onToggleItem(index)}
+                    className={`flex items-start gap-3 p-3 transition-colors cursor-pointer group
+                      ${isSelected ? "bg-indigo-500/5 hover:bg-indigo-500/10" : "hover:bg-white/5"}
+                    `}
+                  >
+                    <div className={`mt-0.5 shrink-0 ${isSelected ? "text-indigo-400" : "text-slate-600 group-hover:text-slate-500"}`}>
+                        {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
+                    </div>
+                    <div>
+                        <span className="text-xs font-mono text-slate-500 mr-2">#{item.index}</span>
+                        <span className={`text-sm ${isSelected ? "text-indigo-100" : "text-slate-300"}`}>
+                            {item.title}
+                        </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            maxHeight: 300,
-            marginBottom: 16,
-            border: "1px solid #333",
-            borderRadius: 8,
-          }}
-        >
-          {playlistInfo.items?.map((item, index) => (
-            <label
-              key={index}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                padding: "12px 16px",
-                borderBottom: "1px solid #333",
-                cursor: "pointer",
-                background: selectedItems.includes(index)
-                  ? "rgba(79, 70, 229, 0.1)"
-                  : "transparent",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={selectedItems.includes(index)}
-                onChange={() => onToggleItem(index)}
-                style={{ marginRight: 12 }}
-              />
-              <span style={{ color: "#666", marginRight: 12, minWidth: 30 }}>
-                {item.index}.
-              </span>
-              <span style={{ flex: 1 }}>{item.title}</span>
-            </label>
-          ))}
-        </div>
-
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+        {/* Footer */}
+        <div className="flex-none p-5 border-t border-white/5 bg-white/[0.02] flex justify-end gap-3 rounded-b-2xl">
           <button
             onClick={onDownloadCurrent}
-            style={{ background: "#333", border: "1px solid #555" }}
+            className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-sm font-medium text-slate-300 transition-colors"
           >
-            Download Current Only
+            Download This Video Only
           </button>
           <button
             onClick={onDownloadSelected}
-            style={{ background: "#4F46E5" }}
             disabled={selectedItems.length === 0}
+            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
           >
             Download Selected ({selectedItems.length})
           </button>

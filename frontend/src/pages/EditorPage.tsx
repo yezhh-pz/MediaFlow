@@ -259,7 +259,7 @@ export function EditorPage() {
   }, [updateRegion]);
 
   return (
-    <div className="h-full flex flex-col bg-slate-950 text-slate-100 overflow-hidden">
+    <div className="h-screen w-full flex flex-col text-slate-100 overflow-hidden">
         {/* Header */}
         <EditorHeader 
             autoScroll={autoScroll}
@@ -271,10 +271,10 @@ export function EditorPage() {
         />
 
         {/* Main Workspace: Top Split */}
-        <div className="flex-1 flex min-h-0">
+        <div className="flex-1 flex min-h-0 bg-[#0a0a0a] gap-[1px]">
              {/* Left: Subtitle List */}
-             <div className="w-1/3 min-w-[280px] max-w-[500px] border-r border-slate-700 flex flex-col">
-                 <div className="flex-1 min-h-0 bg-slate-800">
+             <div className="w-1/3 min-w-[320px] max-w-[480px] flex flex-col bg-[#1a1a1a]">
+                 <div className="flex-1 min-h-0">
                      <SubtitleList 
                         segments={regions}
                         activeSegmentId={activeSegmentId}
@@ -296,12 +296,15 @@ export function EditorPage() {
                  
                  {/* Simplified Detail Editor (Below List) */}
                  {displaySegment && (
-                    <div className="h-24 bg-slate-850 p-2 flex flex-col gap-1 border-t border-slate-700 bg-slate-900 shadow-[inset_0_4px_6px_-1px_rgb(0_0_0_/_0.3)] z-10 transition-all">
-                         <div className="flex justify-between items-center text-xs text-slate-500 px-1">
-                             <span className="font-medium text-indigo-400">
-                                {activeSegmentId ? "Editing Selection" : "Editing Default (First)"}
-                             </span>
-                             <span className="font-mono opacity-50">
+                    <div className="h-28 bg-[#1a1a1a] p-2 flex flex-col gap-1 border-t border-white/5 shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.5)] z-20">
+                         <div className="flex justify-between items-center text-[10px] px-1 select-none">
+                             <div className="flex items-center gap-2">
+                                <span className={`w-1.5 h-1.5 rounded-full ${activeSegmentId ? 'bg-indigo-500 animate-pulse' : 'bg-slate-500'}`} />
+                                <span className="font-bold text-slate-400 tracking-wider uppercase opacity-80">
+                                   {activeSegmentId ? "Editing Selection" : "Editing Default"}
+                                </span>
+                             </div>
+                             <span className="font-mono text-indigo-400/80 bg-indigo-500/5 px-1 py-0 rounded border border-indigo-500/10 text-[9px]">
                                 {((displaySegment.end - displaySegment.start).toFixed(2))}s
                              </span>
                          </div>
@@ -312,23 +315,25 @@ export function EditorPage() {
                             onFocus={() => {
                                 if (!activeSegmentId) selectSegment(String(displaySegment.id), false, false);
                             }}
-                            className="flex-1 w-full bg-slate-800/50 border border-slate-700/50 rounded p-2 text-sm resize-none focus:outline-none focus:border-indigo-500/50 focus:bg-slate-800 transition-colors font-medium leading-relaxed"
-                            placeholder="Enter subtitle text..."
+                            className="flex-1 w-full bg-black/20 border border-white/5 rounded-lg p-2 text-sm resize-none focus:outline-none focus:border-indigo-500/50 focus:bg-black/40 transition-all font-medium leading-normal text-slate-200 placeholder-slate-600/50"
+                            placeholder="Type subtitle text here..."
                          />
                     </div>
                  )}
              </div>
              
              {/* Right: Video Preview */}
-             <VideoPreview 
-                mediaUrl={mediaUrl}
-                videoRef={videoRef}
-                regions={regions}
-             />
+             <div className="flex-1 min-w-0 bg-[#1a1a1a] relative flex flex-col justify-center">
+                <VideoPreview 
+                    mediaUrl={mediaUrl}
+                    videoRef={videoRef}
+                    regions={regions}
+                />
+             </div>
         </div>
         
         {/* Bottom: Waveform Timeline */}
-        <div className="h-36 bg-slate-900 border-t border-slate-700 relative z-20">
+        <div className="h-40 bg-[#1a1a1a] border-t border-white/5 relative z-30 shrink-0">
              {mediaUrl && (
                  <WaveformPlayer 
                     mediaUrl={mediaUrl}

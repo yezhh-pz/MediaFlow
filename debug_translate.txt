@@ -1,0 +1,96 @@
+
+--- New Task ---
+Context Path: E:\Work\Code\Mediaflow\temp\Startup Archive - Mark Zuckerberg on the best advice Peter Thiel ever gave him  “Peter ... [2020470641623760896].srt
+Stem: Startup Archive - Mark Zuckerberg on the best advice Peter Thiel ever gave him  “Peter ... [2020470641623760896]
+Suffix: _CN
+Proposed Save Path: E:\Work\Code\Mediaflow\temp\Startup Archive - Mark Zuckerberg on the best advice Peter Thiel ever gave him  “Peter ... [2020470641623760896]_CN
+
+--- New Task ---
+Context Path: E:\Work\Code\Mediaflow\temp\Startup Archive - Mark Zuckerberg on the best advice Peter Thiel ever gave him  “Peter ... [2020470641623760896].srt
+Stem: Startup Archive - Mark Zuckerberg on the best advice Peter Thiel ever gave him  “Peter ... [2020470641623760896]
+Suffix: _CN
+Proposed Save Path: E:\Work\Code\Mediaflow\temp\Startup Archive - Mark Zuckerberg on the best advice Peter Thiel ever gave him  “Peter ... [2020470641623760896]_CN
+
+--- New Task ---
+Context Path: E:\Work\Code\Mediaflow\temp\Startup Archive - Mark Zuckerberg on the best advice Peter Thiel ever gave him  “Peter ... [2020470641623760896].srt
+Stem: Startup Archive - Mark Zuckerberg on the best advice Peter Thiel ever gave him  “Peter ... [2020470641623760896]
+Suffix: _CN
+Proposed Save Path: E:\Work\Code\Mediaflow\temp\Startup Archive - Mark Zuckerberg on the best advice Peter Thiel ever gave him  “Peter ... [2020470641623760896]_CN
+
+--- New Task ---
+Context Path: E:\Work\Code\Mediaflow\temp\Startup Archive - Mark Zuckerberg on the best advice Peter Thiel ever gave him  “Peter ... [2020470641623760896].srt
+Stem: Startup Archive - Mark Zuckerberg on the best advice Peter Thiel ever gave him  “Peter ... [2020470641623760896]
+Suffix: _CN
+Proposed Save Path: E:\Work\Code\Mediaflow\temp\Startup Archive - Mark Zuckerberg on the best advice Peter Thiel ever gave him  “Peter ... [2020470641623760896]_CN
+
+--- New Task ---
+Context Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4.srt
+Stem: Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4
+Suffix: _CN
+Proposed Save Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4_CN
+
+--- New Task ---
+Context Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4.srt
+Stem: Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4
+Suffix: _CN
+Proposed Save Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4_CN
+
+--- New Task ---
+Context Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4.srt
+Stem: Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4
+Suffix: _CN
+Proposed Save Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4_CN
+
+--- New Task ---
+Context Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4.srt
+Stem: Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4
+Suffix: _CN
+Proposed Save Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4_CN
+
+--- New Task ---
+Context Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4.srt
+Stem: Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4
+Suffix: _CN
+Proposed Save Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4_CN
+
+--- New Task ---
+Context Path: test_video.mp4
+Stem: test_video
+Suffix: _CN
+Proposed Save Path: test_video_CN
+
+--- New Task ---
+Context Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4.srt
+Stem: Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4
+Suffix: _CN
+Proposed Save Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4_CN
+
+--- New Task ---
+Context Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4.srt
+Stem: Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4
+Suffix: _CN
+Proposed Save Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4_CN
+
+--- New Task ---
+Context Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4.srt
+Stem: Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4
+Suffix: _CN
+Proposed Save Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4_CN
+
+--- New Task ---
+Context Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4.srt
+Stem: Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4
+Suffix: _CN
+Proposed Save Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4_CN
+
+--- New Task ---
+Context Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4.srt
+Stem: Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4
+Suffix: _CN
+Proposed Save Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].mp4_CN
+
+--- New Task ---
+Context Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280].srt
+Stem: Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280]
+Suffix: _CN
+Proposed Save Path: E:\Work\Code\Mediaflow\temp\Kevin Carpenter - Warren Buffett： ＂I don't think I can drop dollar bills from the sky a... [2020889300687073280]_CN

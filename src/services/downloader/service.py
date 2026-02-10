@@ -9,7 +9,7 @@ import yt_dlp
 from loguru import logger
 
 from src.config import settings
-from src.models.schemas import MediaAsset
+from src.models.schemas import TaskResult, FileRef
 from src.services.platforms.factory import PlatformFactory
 
 from .config_builder import YtDlpConfigBuilder
@@ -35,7 +35,7 @@ class DownloaderService:
         cookie_file: Optional[str] = None,
         filename: Optional[str] = None,
         local_source: Optional[str] = None
-    ) -> MediaAsset:
+    ) -> TaskResult:
         """
         Async download entry point.
         """
@@ -95,7 +95,7 @@ class DownloaderService:
         cookie_file: Optional[str] = None,
         filename: Optional[str] = None,
         local_source: Optional[str] = None
-    ) -> MediaAsset:
+    ) -> TaskResult:
         
         # 1. Handle Local Source (Direct Download)
         if local_source:
@@ -122,7 +122,7 @@ class DownloaderService:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             if not info:
-                raise Exception("Download failed, cancelled, or no info returned")
+                return TaskResult(success=False, error="Download failed: No info returned")
             
             downloaded_path = ydl.prepare_filename(info)
             duration = info.get('duration', 0)
@@ -139,25 +139,36 @@ class DownloaderService:
                     candidates.sort(key=lambda p: p.suffix in ['.mp4', '.mkv', '.webm', '.m4a', '.mp3'], reverse=True)
                     downloaded_path = str(candidates[0])
                     logger.info(f"Found actual file at: {downloaded_path}")
+                else:
+                    return TaskResult(success=False, error=f"File not found: {dpath}")
 
             # 4. Post Processing
             subtitle_path = self.post_processor.process_subtitles(Path(downloaded_path), download_subs)
             
             logger.success(f"Download complete: {downloaded_path}")
             
-            return MediaAsset(
-                id=task_id or str(uuid.uuid4()),
-                filename=Path(downloaded_path).name,
-                path=downloaded_path,
-                duration=duration,
-                title=title,
-                subtitle_path=subtitle_path
+            files = [
+                FileRef(type="video", path=str(downloaded_path), label="source")
+            ]
+            if subtitle_path:
+                files.append(FileRef(type="subtitle", path=str(subtitle_path), label="downloaded"))
+
+            return TaskResult(
+                success=True,
+                files=files,
+                meta={
+                    "id": task_id or str(uuid.uuid4()),
+                    "title": title,
+                    "duration": duration,
+                    "filename": Path(downloaded_path).name,
+                    "source_url": url
+                }
             )
 
-    def _handle_local_source(self, local_source: str, url: str, filename: Optional[str], playlist_title: Optional[str], task_id: Optional[str]) -> MediaAsset:
+    def _handle_local_source(self, local_source: str, url: str, filename: Optional[str], playlist_title: Optional[str], task_id: Optional[str]) -> TaskResult:
         local_path = Path(local_source)
         if not local_path.exists():
-             raise FileNotFoundError(f"Local source not found: {local_source}")
+             return TaskResult(success=False, error=f"Local source not found: {local_source}")
 
         # Determine destination
         if playlist_title:
@@ -171,11 +182,16 @@ class DownloaderService:
         
         dest_path = self.post_processor.process_local_file(local_path, dest_dir, final_name)
         
-        return MediaAsset(
-            id=task_id or str(uuid.uuid4()),
-            title=final_name,
-            video_path=str(dest_path),
-            duration=0, # Unknown without probing
-            source_url=url,
-            path=str(dest_path) # Compatibility
+        return TaskResult(
+            success=True,
+            files=[
+                FileRef(type="video", path=str(dest_path), label="source")
+            ],
+            meta={
+                "id": task_id or str(uuid.uuid4()),
+                "title": final_name,
+                "duration": 0,
+                "filename": dest_path.name,
+                "source_url": url
+            }
         )

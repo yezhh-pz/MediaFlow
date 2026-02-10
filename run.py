@@ -9,13 +9,20 @@ def main():
         print(" [System] Enforcing WindowsProactorEventLoopPolicy for Playwright compatibility...")
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-    # Run Uvicorn via API, not CLI, to ensure our policy sticks
-    uvicorn.run(
-        "src.main:app", 
-        host=settings.HOST, 
-        port=8000, 
-        reload=False # Disable reload to ensure Policy sticks in the main process
-    )
+    try:
+        # Run Uvicorn via API, not CLI, to ensure our policy sticks
+        uvicorn.run(
+            "src.main:app", 
+            host=settings.HOST, 
+            port=8000, 
+            reload=False # Disable reload to ensure Policy sticks in the main process
+        )
+    except (KeyboardInterrupt, SystemExit):
+        pass
+    except Exception as e:
+        # Only print if it's not a cancellation
+        if "CancelledError" not in str(type(e)):
+            print(f"Server error: {e}")
 
 if __name__ == "__main__":
     main()

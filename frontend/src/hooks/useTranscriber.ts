@@ -139,18 +139,49 @@ export function useTranscriber() {
   }, [checkPendingNavigation]);
 
   // Poll for active task updates
+  const { connected } = useTaskContext(); // Get connected state
+
   useEffect(() => {
     if (!activeTaskId) return;
+
+    // Check if task exists in the current list
     const task = tasks.find((t) => t.id === activeTaskId);
+
     if (task) {
-      if (task.status === "completed" && task.result) {
-        setResult(task.result as TranscribeResult);
+      // Handle terminal states
+      if (task.status === "completed") {
+        if (task.result) {
+          // Map Backend TaskResult -> Frontend TranscribeResult
+          const backendResult = task.result as any; // Typed as TaskResult in backend
+          const meta = backendResult.meta || {};
+          const files = backendResult.files || [];
+
+          const srtFile = files.find((f: any) => f.type === "subtitle");
+
+          const mappedResult: TranscribeResult = {
+            segments: meta.segments || [],
+            text: meta.text || "",
+            language: meta.language || "auto",
+            srt_path: srtFile?.path,
+            video_path: (file as any)?.path, // Persist original video path
+            audio_path: (file as any)?.path,
+          };
+
+          setResult(mappedResult);
+        }
         setActiveTaskId(null);
-      } else if (task.status === "failed") {
-        // Keep it active to show error in UI if needed, or handle here
+      } else if (task.status === "failed" || task.status === "cancelled") {
+        // Turn off processing state if failed/cancelled
+        setActiveTaskId(null);
+      }
+    } else {
+      // Task ID exists in local state but not in the global task list.
+      // Only clear if we are connected (tasks loaded).
+      if (connected) {
+        setActiveTaskId(null);
       }
     }
-  }, [tasks, activeTaskId]);
+  }, [tasks, activeTaskId, connected]);
 
   const handleTranscribe = async () => {
     if (!file) return;

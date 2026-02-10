@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from "react";
 import { apiClient } from "../api/client";
-import { Plus, Edit2, Trash2, CheckCircle, X, AlertCircle } from "lucide-react";
+import { Plus, Edit2, Trash2, CheckCircle, X, AlertCircle, Settings, Cpu, HardDrive, Shield } from "lucide-react";
 
 interface LLMProvider {
     id: string;
@@ -26,6 +26,7 @@ const SettingsPage: React.FC = () => {
     const [settings, setSettings] = useState<UserSettings | null>(null);
     const [openModal, setOpenModal] = useState(false);
     const [notification, setNotification] = useState<Notification | null>(null);
+    const [activeTab, setActiveTab] = useState<'llm' | 'general'>('llm');
     
     // Form State
     const [editingProvider, setEditingProvider] = useState<LLMProvider | null>(null);
@@ -120,193 +121,218 @@ const SettingsPage: React.FC = () => {
         setOpenModal(true);
     };
 
-    // Styles
-    const inputStyle = {
-        width: "100%",
-        padding: "8px 12px",
-        background: "#333",
-        border: "1px solid #555",
-        borderRadius: "4px",
-        color: "#fff",
-        marginBottom: "10px"
-    };
-
-    const labelStyle = {
-        display: "block",
-        fontSize: "0.85em",
-        color: "#aaa",
-        marginBottom: "4px"
-    };
-
-    const buttonStyle = {
-        padding: "8px 16px",
-        borderRadius: "4px",
-        border: "none",
-        cursor: "pointer",
-        fontWeight: 500
-    };
-
     return (
-        <div style={{ padding: "30px", color: "#e5e5e5", height: "100%", overflowY: "auto", position: "relative" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px" }}>
-                <h2 style={{ margin: 0, fontSize: "1.8em" }}>Settings</h2>
-                <button 
-                    onClick={openAdd}
-                    style={{ ...buttonStyle, background: "#4F46E5", color: "white", display: "flex", alignItems: "center", gap: "6px" }}
-                >
-                    <Plus size={18} /> Add Provider
-                </button>
-            </div>
-
-            <div style={{ background: "#1e1e1e", borderRadius: "8px", border: "1px solid #333", overflow: "hidden" }}>
-                <div style={{ padding: "15px 20px", borderBottom: "1px solid #333", display: "flex", gap: "20px" }}>
-                    <div style={{ paddingBottom: "10px", borderBottom: "2px solid #4F46E5", color: "#fff", fontWeight: 500, cursor: "pointer" }}>LLM Providers</div>
-                    <div style={{ paddingBottom: "10px", color: "#666", cursor: "not-allowed" }}>General</div>
+        <div className="h-full w-full bg-[#0a0a0a] text-slate-200 overflow-y-auto overflow-x-hidden relative p-8 fade-in">
+            {/* Context Header */}
+            <div className="flex justify-between items-center mb-8">
+                <div>
+                    <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+                        <Settings className="text-indigo-500" size={28} />
+                        Settings
+                    </h2>
+                    <p className="text-slate-500 text-sm mt-1 ml-10">Manage application configuration and integrations</p>
                 </div>
                 
-                <div style={{ padding: "0" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", color: "#ddd" }}>
-                        <thead>
-                            <tr style={{ textAlign: "left", background: "#252525", fontSize: "0.9em", color: "#aaa" }}>
-                                <th style={{ padding: "12px 20px" }}>Status</th>
-                                <th style={{ padding: "12px 20px" }}>Name</th>
-                                <th style={{ padding: "12px 20px" }}>Model</th>
-                                <th style={{ padding: "12px 20px" }}>Base URL</th>
-                                <th style={{ padding: "12px 20px", textAlign: "right" }}>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {settings?.llm_providers.map((provider) => (
-                                <tr key={provider.id} style={{ borderBottom: "1px solid #333" }}>
-                                    <td style={{ padding: "12px 20px" }}>
-                                        {provider.is_active ? (
-                                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", background: "rgba(16, 185, 129, 0.2)", color: "#10b981", padding: "2px 8px", borderRadius: "12px", fontSize: "0.8em" }}>
-                                                <CheckCircle size={12} /> Active
-                                            </span>
-                                        ) : (
+                {activeTab === 'llm' && (
+                    <button 
+                        onClick={openAdd}
+                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
+                    >
+                        <Plus size={18} /> 
+                        <span>Add Provider</span>
+                    </button>
+                )}
+            </div>
+
+            {/* Config Card */}
+            <div className="bg-[#161616] rounded-2xl border border-white/5 overflow-hidden shadow-xl ring-1 ring-white/5 mx-auto max-w-5xl">
+                {/* Tabs */}
+                <div className="flex border-b border-white/5 bg-white/[0.02]">
+                    <button 
+                        onClick={() => setActiveTab('llm')}
+                        className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition-colors border-b-2 ${activeTab === 'llm' 
+                            ? 'border-indigo-500 text-white bg-white/[0.02]' 
+                            : 'border-transparent text-slate-400 hover:text-white hover:bg-white/[0.01]'}`}
+                    >
+                        <Cpu size={18} className={activeTab === 'llm' ? 'text-indigo-400' : ''} />
+                        LLM Providers
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('general')}
+                        className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition-colors border-b-2 ${activeTab === 'general' 
+                            ? 'border-indigo-500 text-white bg-white/[0.02]' 
+                            : 'border-transparent text-slate-400 hover:text-white hover:bg-white/[0.01]'}`}
+                    >
+                        <HardDrive size={18} className={activeTab === 'general' ? 'text-indigo-400' : ''} />
+                        General & Storage
+                    </button>
+                </div>
+                
+                {/* Content Area */}
+                <div className="p-0 min-h-[400px]">
+                    {activeTab === 'llm' ? (
+                        <div className="w-full">
+                            <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-[#1a1a1a] border-b border-white/5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                <div className="col-span-2">Status</div>
+                                <div className="col-span-3">Name</div>
+                                <div className="col-span-3">Model</div>
+                                <div className="col-span-3">Base URL</div>
+                                <div className="col-span-1 text-right">Actions</div>
+                            </div>
+                            
+                            <div className="divide-y divide-white/5">
+                                {settings?.llm_providers.map((provider) => (
+                                    <div key={provider.id} className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-white/[0.02] transition-colors group">
+                                        <div className="col-span-2">
+                                            {provider.is_active ? (
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+                                                    <CheckCircle size={12} /> Active
+                                                </span>
+                                            ) : (
+                                                <button 
+                                                    onClick={() => handleSetActive(provider.id)}
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-white/5 text-slate-400 border border-white/5 hover:bg-white/10 hover:text-white hover:border-white/20 transition-all"
+                                                >
+                                                    Set Active
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="col-span-3 font-medium text-slate-200">{provider.name}</div>
+                                        <div className="col-span-3 font-mono text-xs text-indigo-300/80 bg-indigo-500/5 px-2 py-1 rounded w-fit border border-indigo-500/10">
+                                            {provider.model}
+                                        </div>
+                                        <div className="col-span-3 text-xs text-slate-500 truncate font-mono" title={provider.base_url}>
+                                            {provider.base_url}
+                                        </div>
+                                        <div className="col-span-1 flex justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
                                             <button 
-                                                onClick={() => handleSetActive(provider.id)}
-                                                style={{ background: "transparent", border: "1px solid #555", color: "#aaa", padding: "2px 8px", borderRadius: "12px", fontSize: "0.8em", cursor: "pointer" }}
+                                                onClick={() => openEdit(provider)} 
+                                                className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                                                title="Edit"
                                             >
-                                                Set Active
+                                                <Edit2 size={16} />
                                             </button>
-                                        )}
-                                    </td>
-                                    <td style={{ padding: "12px 20px", fontWeight: 500 }}>{provider.name}</td>
-                                    <td style={{ padding: "12px 20px", fontFamily: "monospace", color: "#818cf8" }}>{provider.model}</td>
-                                    <td style={{ padding: "12px 20px", fontSize: "0.9em", color: "#888" }}>{provider.base_url}</td>
-                                    <td style={{ padding: "12px 20px", textAlign: "right" }}>
-                                        <button onClick={() => openEdit(provider)} style={{ background: "none", border: "none", cursor: "pointer", color: "#aaa", marginRight: "10px" }} title="Edit">
-                                            <Edit2 size={16} />
-                                        </button>
-                                        <button onClick={() => handleDelete(provider.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444" }} title="Delete">
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                            {(!settings?.llm_providers || settings.llm_providers.length === 0) && (
-                                <tr>
-                                    <td colSpan={5} style={{ padding: "30px", textAlign: "center", color: "#666" }}>No providers configured</td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                                            <button 
+                                                onClick={() => handleDelete(provider.id)} 
+                                                className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-colors"
+                                                title="Delete"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                                
+                                {(!settings?.llm_providers || settings.llm_providers.length === 0) && (
+                                    <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+                                        <Shield size={48} className="opacity-20 mb-4" />
+                                        <p className="text-sm">No providers configured</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="p-8 flex flex-col items-center justify-center text-slate-500 h-[400px]">
+                             {/* General Settings Placeholder */}
+                             <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 shadow-inner mb-4">
+                                <Settings size={48} className="opacity-20 animate-spin-slow" style={{ animationDuration: '10s' }} />
+                            </div>
+                            <h3 className="text-lg font-medium text-slate-400 mb-2">General Settings</h3>
+                            <p className="text-sm max-w-md text-center opacity-60">
+                                System configuration, storage paths, and update management will be available here in future updates.
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
 
             {/* Modal Overlay */}
             {openModal && (
-                <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.7)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 }}>
-                    <div style={{ background: "#222", padding: "25px", borderRadius: "8px", width: "450px", border: "1px solid #444", boxShadow: "0 10px 25px rgba(0,0,0,0.5)" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                            <h3 style={{ margin: 0 }}>{editingProvider ? "Edit Provider" : "Add Provider"}</h3>
-                            <button onClick={() => setOpenModal(false)} style={{ background: "none", border: "none", color: "#888", cursor: "pointer" }}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 shadow-2xl w-full max-w-md overflow-hidden ring-1 ring-white/5 animate-in zoom-in-95 duration-200">
+                        <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                            <h3 className="text-lg font-bold text-white">
+                                {editingProvider ? "Edit Provider" : "Add Provider"}
+                            </h3>
+                            <button onClick={() => setOpenModal(false)} className="text-slate-500 hover:text-white transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
                         
-                        <div>
-                            <label style={labelStyle}>Display Name</label>
-                            <input 
-                                style={inputStyle}
-                                value={formData.name}
-                                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                                placeholder="e.g. My DeepSeek"
-                            />
+                        <div className="p-6 space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Display Name</label>
+                                <input 
+                                    className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-all placeholder-slate-600"
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                    placeholder="e.g. My DeepSeek"
+                                />
+                            </div>
                             
-                            <label style={labelStyle}>Base URL</label>
-                            <input 
-                                style={inputStyle}
-                                value={formData.base_url}
-                                onChange={(e) => setFormData({...formData, base_url: e.target.value})}
-                                placeholder="https://api.openai.com/v1"
-                            />
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Base URL</label>
+                                <input 
+                                    className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-all font-mono placeholder-slate-600"
+                                    value={formData.base_url}
+                                    onChange={(e) => setFormData({...formData, base_url: e.target.value})}
+                                    placeholder="https://api.openai.com/v1"
+                                />
+                            </div>
                             
-                            <label style={labelStyle}>API Key</label>
-                            <input 
-                                style={inputStyle}
-                                type="password"
-                                value={formData.api_key}
-                                onChange={(e) => setFormData({...formData, api_key: e.target.value})}
-                                placeholder="sk-..."
-                            />
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">API Key</label>
+                                <input 
+                                    className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-all font-mono placeholder-slate-600"
+                                    type="password"
+                                    value={formData.api_key}
+                                    onChange={(e) => setFormData({...formData, api_key: e.target.value})}
+                                    placeholder="sk-..."
+                                />
+                            </div>
                             
-                            <label style={labelStyle}>Model Name</label>
-                            <input 
-                                style={inputStyle}
-                                value={formData.model}
-                                onChange={(e) => setFormData({...formData, model: e.target.value})}
-                                placeholder="e.g. gpt-4o, deepseek-chat"
-                            />
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Model Name</label>
+                                <input 
+                                    className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-all font-mono placeholder-slate-600"
+                                    value={formData.model}
+                                    onChange={(e) => setFormData({...formData, model: e.target.value})}
+                                    placeholder="e.g. gpt-4o, deepseek-chat"
+                                />
+                            </div>
                         </div>
                         
-                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "20px" }}>
+                        <div className="px-6 py-4 bg-white/[0.02] border-t border-white/5 flex justify-end gap-3">
                             <button 
                                 onClick={() => setOpenModal(false)}
-                                style={{ ...buttonStyle, background: "transparent", color: "#ccc", border: "1px solid #555" }}
+                                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
                             >
                                 Cancel
                             </button>
                             <button 
                                 onClick={handleSaveProvider}
-                                style={{ ...buttonStyle, background: "#4F46E5", color: "white" }}
+                                className="px-6 py-2 rounded-lg text-sm font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
                             >
-                                Save
+                                Save Changes
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Custom Toast Notification */}
+            {/* Notifications */}
             {notification && (
-                <div style={{ 
-                    position: "fixed", 
-                    bottom: 20, 
-                    right: 20, 
-                    background: notification.type === 'error' ? '#ef4444' : '#10b981',
-                    color: '#fff',
-                    padding: '12px 20px',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    zIndex: 2000,
-                    animation: 'slideIn 0.3s ease-out'
-                }}>
+                <div 
+                    className={`fixed bottom-6 right-6 flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl z-50 animate-in slide-in-from-bottom-5 duration-300 ${
+                        notification.type === 'error' 
+                        ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
+                        : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    }`}
+                >
                     {notification.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
-                    <span style={{ fontWeight: 500 }}>{notification.message}</span>
+                    <span className="font-medium text-sm">{notification.message}</span>
                 </div>
             )}
-            
-            <style>{`
-                @keyframes slideIn {
-                    from { transform: translateY(100%); opacity: 0; }
-                    to { transform: translateY(0); opacity: 1; }
-                }
-            `}</style>
         </div>
     );
 };

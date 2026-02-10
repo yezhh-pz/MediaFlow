@@ -29,10 +29,10 @@ function VideoPreviewComponent({
     );
 
     return (
-        <div className="flex-1 bg-black flex flex-col relative justify-center items-center">
+        <div className="flex-1 bg-black/40 flex flex-col relative justify-center items-center backdrop-blur-sm">
             {mediaUrl ? (
-                <div className="w-full h-full relative p-4 flex flex-col">
-                    <div className="flex-1 relative flex items-center justify-center bg-black/50 rounded-lg overflow-hidden border border-slate-800">
+                <div className="w-full h-full relative p-6 flex flex-col">
+                    <div className="flex-1 relative flex items-center justify-center bg-black/50 rounded-2xl overflow-hidden border border-white/5 shadow-2xl ring-1 ring-white/5">
                         <video 
                            ref={videoRef as any}
                            src={mediaUrl}
@@ -40,18 +40,22 @@ function VideoPreviewComponent({
                            controls={true}
                            onTimeUpdate={handleTimeUpdate}
                         />
-                        {/* Overlay Subtitles */}
-                        <div className="absolute bottom-24 left-0 right-0 text-center pointer-events-none">
-                            <span className="bg-black/60 text-white px-3 py-1.5 rounded text-xl font-medium shadow-sm backdrop-blur-sm">
-                                {currentSubtitle}
-                            </span>
+                        {/* Overlay Subtitles (Improved Typography) */}
+                        <div className="absolute bottom-16 left-0 right-0 text-center pointer-events-none px-12">
+                            {currentSubtitle && (
+                                <span className="inline-block bg-black/60 text-white/95 px-6 py-3 rounded-xl text-lg md:text-xl font-medium shadow-lg backdrop-blur-md border border-white/10 leading-relaxed max-w-full break-words">
+                                    {currentSubtitle}
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
             ) : (
-                <div className="text-slate-600 flex flex-col items-center">
-                    <Clapperboard size={48} className="mb-4 opacity-50" />
-                    <p>No media loaded</p>
+                <div className="text-slate-500/50 flex flex-col items-center gap-4">
+                    <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 shadow-inner">
+                        <Clapperboard size={64} className="opacity-20" />
+                    </div>
+                    <p className="text-sm font-medium tracking-wide opacity-60">No media loaded</p>
                 </div>
             )}
         </div>

@@ -9,75 +9,90 @@ interface TranscriptionResultsProps {
 
 export function TranscriptionResults({ result, onSendToEditor, onSendToTranslator }: TranscriptionResultsProps) {
   return (
-    <div className="col-span-8 flex flex-col bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-      <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
-        <h2 className="font-semibold text-slate-200 flex items-center gap-2">
-          <FileText className="w-4 h-4 text-purple-400" />
-          Result Preview
+    <div className="h-full flex flex-col bg-[#1a1a1a] border border-white/5 rounded-2xl shadow-2xl overflow-hidden">
+      {/* Header */}
+      <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+        <h2 className="text-base font-semibold text-white flex items-center gap-2">
+           <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+             <FileText className="w-4 h-4 text-indigo-400" />
+           </div>
+           Result Preview
         </h2>
+        {result && result.segments && (
+          <div className="px-2.5 py-1 rounded-md bg-white/5 border border-white/5 text-xs font-mono text-slate-400 flex items-center gap-2">
+            <span>{result.segments.length} segments</span>
+          </div>
+        )}
       </div>
       
-      <div className="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-sm">
-        {result ? (
-          result.segments.map((seg) => (
-            <div key={seg.id} className="flex gap-4 p-2 hover:bg-slate-700/50 rounded group">
-              <div className="text-slate-500 w-24 shrink-0 select-none text-xs pt-1">
-                {new Date(seg.start * 1000).toISOString().substr(11, 8)}
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-0 scroll-smooth custom-scrollbar bg-black/20">
+        {result && result.segments && result.segments.length > 0 ? (
+          <div className="divide-y divide-white/5">
+            {result.segments.map((seg, idx) => (
+              <div key={seg.id} className="flex gap-4 p-4 hover:bg-white/[0.02] transition-colors group">
+                <div className="w-8 text-xs text-slate-600 font-mono pt-1 text-right shrink-0 select-none">
+                  {idx + 1}
+                </div>
+                <div className="text-slate-500 w-20 shrink-0 select-none text-xs font-mono pt-1">
+                  {new Date(seg.start * 1000).toISOString().substr(11, 8)}
+                </div>
+                <div className="text-slate-300 group-hover:text-white transition-colors text-sm leading-relaxed">
+                  {seg.text}
+                </div>
               </div>
-              <div className="text-slate-300 group-hover:text-white transition-colors">
-                {seg.text}
-              </div>
-            </div>
-          ))
+            ))}
+          </div>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-3">
-            <FileText className="w-12 h-12 opacity-20" />
-            <p>No transcription results yet</p>
+          <div className="h-full flex flex-col items-center justify-center text-slate-600 gap-4">
+            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
+               <FileText className="w-8 h-8 opacity-20" />
+            </div>
+            <p className="text-sm font-medium">No transcription results yet</p>
           </div>
         )}
       </div>
 
+      {/* Footer Actions */}
       {result && (
-        <div className="p-4 border-t border-slate-700 bg-slate-900/50 flex justify-end gap-3 sticky bottom-0">
-            <button
-            onClick={() => {
-                // Ensure we pass the correct structure
-                const payload = {
-                    video_path: result.video_path || result.audio_path,
-                    subtitle_path: result.srt_path || result.subtitle_path
-                };
-                if (payload.subtitle_path) {
-                     onSendToTranslator(payload as any); 
-                } else {
-                    alert("No SRT file path found in result. Cannot translate.");
-                }
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-indigo-900/20"
-            >
-            <ArrowRight size={16} />
-            Translate
-            </button>
-            <button
-            onClick={onSendToEditor}
-            className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-500 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-pink-900/20"
-            >
-            <Clapperboard size={16} />
-            Open Editor
-            </button>
-        </div>
-      )}
+        <div className="p-4 border-t border-white/5 bg-white/[0.02] flex justify-between items-center gap-4">
+             {result.srt_path && (
+                 <button 
+                  onClick={() => window.electronAPI && window.electronAPI.showInExplorer(result.srt_path!)}
+                  className="text-xs text-slate-500 hover:text-indigo-400 flex items-center gap-1.5 transition-colors px-3 py-2 rounded-lg hover:bg-white/5"
+                 >
+                   <FolderOpen className="w-3.5 h-3.5" />
+                   <span className="truncate max-w-[200px]">{result.srt_path}</span>
+                 </button>
+             )}
 
-      {result && result.srt_path && (
-         <div className="p-2 px-4 bg-slate-900 border-t border-slate-700 text-xs text-slate-500 truncate flex justify-between">
-            <span>SRT saved to: {result.srt_path}</span>
-            <button 
-              onClick={() => window.electronAPI && window.electronAPI.showInExplorer(result.srt_path!)}
-              className="flex items-center gap-1 text-purple-400 hover:text-purple-300 ml-2 transition-colors"
-            >
-              <FolderOpen className="w-3 h-3" />
-              Open Folder
-            </button>
-         </div>
+            <div className="flex gap-3">
+                <button
+                onClick={() => {
+                    const payload = {
+                        video_path: result.video_path || result.audio_path,
+                        subtitle_path: result.srt_path || result.subtitle_path
+                    };
+                    if (payload.subtitle_path) {
+                            onSendToTranslator(payload as any); 
+                    } else {
+                        alert("No SRT file path found in result. Cannot translate.");
+                    }
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 hover:border-indigo-500/30 rounded-xl text-sm font-medium transition-all"
+                >
+                <ArrowRight size={16} />
+                Translate
+                </button>
+                <button
+                onClick={onSendToEditor}
+                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:shadow-lg hover:shadow-purple-500/20 text-white rounded-xl text-sm font-medium transition-all transform hover:-translate-y-0.5"
+                >
+                <Clapperboard size={16} />
+                Open Editor
+                </button>
+            </div>
+        </div>
       )}
     </div>
   );

@@ -55,7 +55,7 @@ const WaveformPlayerComponent: React.FC<WaveformPlayerProps> = ({
             progressColor: '#818cf8',
             cursorColor: '#38bdf8', // Cyan Playhead
             cursorWidth: 2,
-            height: 128,
+            height: containerRef.current.clientHeight,
             minPxPerSec: zoom,
             media: videoRef.current,
             plugins: [
@@ -251,26 +251,37 @@ const WaveformPlayerComponent: React.FC<WaveformPlayerProps> = ({
     }, [autoScroll]);
     
     return (
-        <div className="w-full h-full flex flex-col relative bg-slate-900">
+        <div className="w-full h-full flex flex-col relative bg-[#0a0a0a] border-t border-white/10">
             {/* Toolbar */}
-            <div className="absolute top-2 right-2 z-10 flex gap-2">
-                <button onClick={handleZoomOut} className="bg-slate-800 p-1 rounded hover:bg-slate-700 text-slate-300 pointer-events-auto">
-                     -
+            <div className="absolute top-3 right-3 z-30 flex gap-2">
+                <button 
+                  onClick={handleZoomOut} 
+                  className="bg-black/40 backdrop-blur-md p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 transition-all shadow-lg active:scale-95"
+                  title="Zoom Out"
+                >
+                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 </button>
-                <button onClick={handleZoomIn} className="bg-slate-800 p-1 rounded hover:bg-slate-700 text-slate-300 pointer-events-auto">
-                     +
+                <button 
+                  onClick={handleZoomIn} 
+                  className="bg-black/40 backdrop-blur-md p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 transition-all shadow-lg active:scale-95"
+                  title="Zoom In"
+                >
+                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 </button>
             </div>
 
-            <div className="relative w-full h-full overflow-x-auto wavesurfer-wrapper" ref={containerRef} onContextMenu={(e) => e.preventDefault()}>
+            <div className="relative w-full h-full overflow-x-auto wavesurfer-wrapper custom-scrollbar" ref={containerRef} onContextMenu={(e) => e.preventDefault()}>
                {/* Timeline container */}
-               <div id="waveform-timeline" className="absolute top-0 left-0 w-full h-4 z-10 pointer-events-none"></div>
+               <div id="waveform-timeline" className="absolute top-0 left-0 w-full h-5 z-20 pointer-events-none opacity-70"></div>
             </div>
             
             {/* Loading Overlay */}
             {!isReady && (
-                <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 z-20 backdrop-blur-sm">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+                <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a]/80 z-40 backdrop-blur-sm transition-all duration-500">
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-indigo-500 border-t-transparent shadow-[0_0_15px_rgba(99,102,241,0.5)]"></div>
+                        <span className="text-xs font-medium text-indigo-400 tracking-wider uppercase animate-pulse">Generated Waveform</span>
+                    </div>
                 </div>
             )}
         </div>
