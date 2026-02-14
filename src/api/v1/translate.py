@@ -103,6 +103,31 @@ async def run_translation_task(task_id: str, req: TranslateRequest):
     )
 
 
+@router.post("/segment", response_model=TranslateResponse)
+async def translate_segment_sync(req: TranslateRequest):
+    """
+    Synchronous translation for editor context menu.
+    Designed for small batches (user selection).
+    """
+    translator = _get_llm_translator()
+    try:
+        # For small selections, we process immediately
+        translated = translator.translate_segments(
+            req.segments, 
+            req.target_language, 
+            req.mode,
+            batch_size=max(1, len(req.segments)) # Process as single batch
+        )
+        
+        return TranslateResponse(
+            task_id="sync_translation",
+            status="completed",
+            segments=translated
+        )
+    except Exception as e:
+        logger.error(f"Sync translation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/", response_model=TranslateResponse)
 async def translate_subtitles(req: TranslateRequest, background_tasks: BackgroundTasks):
     """

@@ -153,32 +153,34 @@ const WaveformPlayerComponent: React.FC<WaveformPlayerProps> = ({
         }, 10); // Threshold (slop) in pixels
 
         // Region Events
+        // Region Events
         regionsPlugin.on('region-created', (region) => {
-             // CRITICAL FIX: Distinguish between user-dragged regions and programmatically added regions
-             // If this region's ID exists in our props.regions, it's NOT a temp region.
-             // Use Ref because this effect runs once (stale closure)
+             // 1. Check if this is a "Prop-Sync" region (Programmatic)
+             // We use latestRegionsRef to check if this ID exists in our props
              const isRealRegion = latestRegionsRef.current.some(r => String(r.id) === region.id);
              
-             // 2. Mark this as current temp
-             if (!isRealRegion) {
-                 // 1. Remove previous temp region if exists
-                 if (currentTempRegionId.current && currentTempRegionId.current !== region.id) {
-                     const prev = regionsPlugin.getRegions().find(r => r.id === currentTempRegionId.current);
-                     if (prev) prev.remove();
-                 }
-                 
-                 // 2. Mark this as current temp
-                 currentTempRegionId.current = region.id;
-                 
-                 // Mark as user created so we don't auto-delete it immediately in useEffect sync
-                 (region as any).isUserCreated = true;
-             }
-
+             // 2. Event Listener Attachment (Universal)
+             // We MUST attach context menu to ALL regions, whether temp or real
              if(region.element) {
                  region.element.addEventListener('contextmenu', (e) => {
                      e.preventDefault();
                      onContextMenu(e, region.id, { start: region.start, end: region.end });
                  });
+             }
+
+             // 3. Temp Region Logic (User Drag Only)
+             if (!isRealRegion) {
+                 // Clear previous temp region if it exists due to stale state
+                 if (currentTempRegionId.current && currentTempRegionId.current !== region.id) {
+                     const prev = regionsPlugin.getRegions().find(r => r.id === currentTempRegionId.current);
+                     if (prev) prev.remove();
+                 }
+                 
+                 currentTempRegionId.current = region.id;
+                 (region as any).isUserCreated = true;
+                 
+                 // Show Toast hint
+                 // toast.info("Right-click to identify segment", { duration: 2000 });
              }
         });
 
@@ -187,49 +189,39 @@ const WaveformPlayerComponent: React.FC<WaveformPlayerProps> = ({
                  isDraggingRef.current = true;
                  onInteractStart?.();
              }
-             // Ensure duration is updated if needed (unlikely on region move but safe)
              if (wavesurfer.current) setDuration(wavesurfer.current.getDuration());
         });
 
         regionsPlugin.on('region-updated', (region) => {
              isDraggingRef.current = false;
-             // Final sync
-             onRegionUpdate(region.id, region.start, region.end);
+             // Only update parent if it's a REAL region
+             // Temp regions don't sync back to parent until "Insert" is clicked
+             const isReal = latestRegionsRef.current.some(r => String(r.id) === region.id);
+             if (isReal) {
+                onRegionUpdate(region.id, region.start, region.end);
+             }
         });
 
         regionsPlugin.on('region-clicked', (region, e) => {
             onRegionClick(region.id, e);
         });
         
+        // Interaction (Click on background)
         ws.on('interaction', () => {
-             // Clear temp region on click (if not clicking the region itself)
-             // Note: region-click handles region clicks. interaction handles waveform clicks.
-             // We need a small timeout because interaction fires before region-click? 
-             // Actually, if we click outside, we want to clear.
-             // If we drag, region-created fires.
-             // If we click the region, region-clicked fires.
-             
-             // Simple logic: interaction clears temp UNLESS it was just created or clicked
-             // But we don't want to clear immediately on drag start?
-             // Actually 'interaction' fires on seek (click).
-             
-             // Let's rely on CLICK event for clearing (seeking)
+             // We wait a tick to see if a region was clicked/created
+             // But actually, 'interaction' is broad. 
+             // Let's use 'click' specifically for clearing.
         });
         
-        // Use 'click' to clear temp region if we clicked outside
-        // Note: WaveSurfer click event argument might vary, usually it's relative position or event
+        // Click on Waveform (Background) -> Clear Temp Region
         ws.on('click', () => {
-            if (currentTempRegionId.current) {
-                // If we are NOT dragging (just clicked), remove the temp region
-                // Limitation: If we click *inside* the temp region, does this fire?
-                // RegionsPlugin usually stops propagation if region is clicked.
-                // So this should only fire if we click OUTSIDE.
-                const temp = regionsPlugin.getRegions().find(r => r.id === currentTempRegionId.current);
-                if (temp) {
-                    temp.remove();
-                    currentTempRegionId.current = null;
-                }
-            }
+             if (currentTempRegionId.current) {
+                 const temp = regionsPlugin.getRegions().find(r => r.id === currentTempRegionId.current);
+                 if (temp) {
+                     temp.remove();
+                     currentTempRegionId.current = null;
+                 }
+             }
         });
 
         ws.on('ready', () => {
@@ -290,25 +282,12 @@ const WaveformPlayerComponent: React.FC<WaveformPlayerProps> = ({
     useEffect(() => {
         if (!wsRegions.current || !isReady) return;
         
-        // console.log('Syncing Regions:', regions.length, 'Current Temp:', currentTempRegionId.current);
-        
-        // --- PERFORMANCE OPTIMIZATION ---
-        // We do typically 2 things: 
-        // 1. Calculate appearance (color)
-        // 2. Diff against existing regions to add/remove/update
-        // Crucial: We must NOT re-run this if only the 'text' of a segment changed!
-        
-        // 1. Prepare "Geometry & Style" map
+        // --- PERFORMANCE OPTIMIZATION & STRICT SYNC ---
+        // 1. Prepare "Geometry & Style" map from Props (The Truth)
         const geometryMap = new Map<string, { start: number, end: number, color: string }>();
         const overlappingIds = new Set<string>();
-        
-        // n^2 overlap check (acceptable for < 2000 items usually, but strictly we can't avoid it without interval tree)
-        // For performance, maybe we skip overlap check on every keypress? 
-        // But here we are protected by `geometry` comparison down below hopefully.
-        // Actually, if we type, `regions` changes. UseEffect triggers.
-        // We need to verify if start/end/color changed.
 
-        // Calculate overlapping
+        // Overlap Detection (O(n^2) but n < 2000 usually ok)
         for (let i = 0; i < regions.length; i++) {
             for (let j = i + 1; j < regions.length; j++) {
                 const r1 = regions[i];
@@ -321,7 +300,6 @@ const WaveformPlayerComponent: React.FC<WaveformPlayerProps> = ({
             }
         }
 
-        // Build desired state
         regions.forEach(seg => {
             const strId = String(seg.id);
             const isSelected = selectedIds.includes(strId);
@@ -337,25 +315,24 @@ const WaveformPlayerComponent: React.FC<WaveformPlayerProps> = ({
 
         const existingRegions = wsRegions.current.getRegions();
         
-        // 1. Remove deleted
+        // 2. Remove regions that are NOT in props AND NOT the current temp region
         existingRegions.forEach(r => {
-            if (!geometryMap.has(r.id)) {
-                // strict check: passed regions are authoritative source.
-                // EXCEPTION: The currently active temporary region (user just dragged it)
-                if (currentTempRegionId.current === r.id) {
-                     // Keep it!
-                } else {
-                    r.remove();
-                }
+            const isPropRegion = geometryMap.has(r.id);
+            const isTempRegion = currentTempRegionId.current === r.id;
+
+            if (!isPropRegion && !isTempRegion) {
+                // Determine if it WAS a temp region that should be removed?
+                // actually if it's not current temp, it's garbage.
+                r.remove();
             }
         });
 
-        // 2. Add or Update
+        // 3. Add or Update Prop Regions
         geometryMap.forEach((geo, id) => {
             const existing = existingRegions.find(r => r.id === id);
             
             if (existing) {
-                // DIFF: Only update if visual properties changed
+                // Update if changed
                 const startChanged = Math.abs(existing.start - geo.start) > 0.001;
                 const endChanged = Math.abs(existing.end - geo.end) > 0.001;
                 const colorChanged = existing.color !== geo.color;
@@ -364,10 +341,13 @@ const WaveformPlayerComponent: React.FC<WaveformPlayerProps> = ({
                     existing.setOptions({
                         start: geo.start,
                         end: geo.end,
-                        color: geo.color
+                        color: geo.color,
+                        drag: true, // Ensure drag is enabled for real regions too (for editing)
+                        resize: true
                     });
                 }
             } else {
+                // Add new
                 wsRegions.current?.addRegion({
                     id: id,
                     start: geo.start,
@@ -379,7 +359,7 @@ const WaveformPlayerComponent: React.FC<WaveformPlayerProps> = ({
             }
         });
 
-    }, [regions, selectedIds, isReady, zoom]); // Still triggers on regions change (text), but internal Diff prevents WS mutation
+    }, [regions, selectedIds, isReady, zoom]);
 
     // Zoom setup...
     useEffect(() => {
@@ -392,7 +372,7 @@ const WaveformPlayerComponent: React.FC<WaveformPlayerProps> = ({
         }
     }, [zoom]);
 
-    // Placeholder for handleZoomIn/Out, not provided in the instruction
+    // Zoom Handlers
     const handleZoomIn = () => setZoom(prev => Math.min(200, prev + 10));
     const handleZoomOut = () => setZoom(prev => Math.max(5, prev - 10));
 

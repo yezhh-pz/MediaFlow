@@ -153,6 +153,41 @@ export interface SynthesizeRequest {
   options: SynthesizeOptions;
 }
 
+export interface TranscribeSegmentRequest extends SynthesizeRequest {
+  audio_path: string;
+  start: number;
+  end: number;
+  model?: string;
+  device?: string;
+  language?: string;
+  initial_prompt?: string;
+}
+
+export interface TranscribeSegmentResponse {
+  status: "completed" | "pending";
+  task_id?: string;
+  data?: {
+    text: string;
+    segments: any[];
+  };
+  message?: string;
+}
+
+// ─── Translate ─────────────────────────────────────────────────────
+
+export interface TranslateRequest {
+  segments: any[]; // SubtitleSegment[]
+  target_language: string;
+  mode?: "standard" | "intelligent";
+  context_path?: string | null;
+}
+
+export interface TranslateResponse {
+  task_id: string;
+  status: string;
+  segments?: any[]; // SubtitleSegment[]
+}
+
 // ─── Internal Generic Request Wrapper ────────────────────────────
 
 async function request<T>(
@@ -214,6 +249,23 @@ async function request<T>(
 // ─── API Client ──────────────────────────────────────────────────
 
 export const apiClient = {
+  // ─── ASR ─────────────────────────────────────────────────────────
+
+  transcribeSegment: (payload: TranscribeSegmentRequest) => {
+    // @ts-ignore
+    return request<TranscribeSegmentResponse>("/transcribe/segment", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  translateSegments: (payload: TranslateRequest) => {
+    return request<TranslateResponse>("/translate/segment", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
   checkHealth: () => {
     // Health check might be on root URL, not /api/v1
     const baseUrl = API_BASE.replace("/api/v1", "");

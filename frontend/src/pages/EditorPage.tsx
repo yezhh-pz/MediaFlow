@@ -6,6 +6,7 @@ import { FindReplaceDialog } from "../components/dialogs/FindReplaceDialog";
 import { SynthesisDialog } from "../components/dialogs/SynthesisDialog";
 import { ContextMenu, type ContextMenuItem } from "../components/ui/ContextMenu";
 import { apiClient } from "../api/client";
+import { formatSRTTime } from "../utils/subtitleParser";
 
 // Extracted Components
 import { EditorHeader } from "../components/editor/EditorHeader";
@@ -44,6 +45,8 @@ export function EditorPage() {
   const snapshot = useEditorStore(state => state.snapshot);
   const selectSegment = useEditorStore(state => state.selectSegment);
   const addSegment = useEditorStore(state => state.addSegment);
+  const addSegments = useEditorStore(state => state.addSegments);
+  const updateSegments = useEditorStore(state => state.updateSegments);
 
   const {
       mediaUrl,
@@ -195,7 +198,7 @@ export function EditorPage() {
       // 1. Check if ID exists (Is it a real segment?)
       const existing = regionsRef.current.find(r => r.id === id);
 
-      if (!existing && regionData) {
+       if (!existing && regionData) {
            // Temporary region created by drag
            setContextMenu({
                position: { x: e.clientX, y: e.clientY },
@@ -214,6 +217,68 @@ export function EditorPage() {
                            // Select it immediately
                            setTimeout(() => selectSegment(newId, false, false), 50);
                        }
+                   },
+                   {
+                        label: "🎙️ 识别选中区域 (ASR)",
+                        onClick: async () => {
+                            if (!currentFilePath) {
+                                alert("请先保存或打开一个文件");
+                                return;
+                            }
+                            
+                            // Dynamically import toast
+                            const { toast } = await import("../utils/toast");
+                            toast.info("正在识别片段...", 2000);
+
+                            try {
+                                const res = await apiClient.transcribeSegment({
+                                    video_path: "", 
+                                    audio_path: currentFilePath, 
+                                    srt_path: "", 
+                                    watermark_path: null,
+                                    start: regionData.start,
+                                    end: regionData.end,
+                                    options: {}
+                                });
+
+                                if (res.status === 'completed' && res.data) {
+                                    const { segments, text } = res.data;
+                                    
+                                    if (segments && segments.length > 0) {
+                                        // Use granular segments
+                                        const newSegments = segments.map((seg: any, idx: number) => ({
+                                            id: String(Date.now() + idx),
+                                            start: seg.start,
+                                            end: seg.end,
+                                            text: seg.text.trim()
+                                        }));
+                                        
+                                        addSegments(newSegments);
+                                        toast.success(`成功识别 ${newSegments.length} 个片段`);
+                                    } else {
+                                        // Fallback to single block
+                                        const newId = String(Date.now());
+                                        const fullText = text.trim();
+                                        
+                                        addSegment({
+                                            id: newId,
+                                            start: regionData.start,
+                                            end: regionData.end,
+                                            text: fullText || "[无语音]"
+                                        });
+                                        
+                                        setTimeout(() => selectSegment(newId, false, false), 50);
+                                        toast.success("识别成功");
+                                    }
+                                } else {
+                                    // Pending or Other
+                                    toast.info(`片段较长，后台处理中... (Task: ${res.task_id})`, 5000);
+                                }
+                            } catch (e) {
+                                console.error(e);
+                                toast.error("识别失败: " + String(e));
+                            }
+                        }
                    },
                    { separator: true, label: "", onClick: () => {} },
                    { label: "取消", onClick: () => {} }
@@ -252,6 +317,115 @@ export function EditorPage() {
                               videoRef.current.play();
                           }
                       }
+                  },
+                  {
+                      label: "🌐 翻译选中区域 (LLM)",
+                      onClick: async () => {
+                          const selected = regionsRef.current.filter(r => targetSelectedIds.includes(String(r.id)));
+                          if (selected.length === 0) return;
+                          
+                          const { toast } = await import("../utils/toast");
+                          toast.info("正在翻译...", 2000);
+                          
+                          try {
+                              const res = await apiClient.translateSegments({
+                                  segments: selected,
+                                  target_language: "Chinese" 
+                              });
+                              
+                              if (res.status === 'completed' && res.segments) {
+                                  updateSegments(res.segments);
+                                  toast.success("翻译完成");
+                              } else {
+                                  toast.info(`任务处理中 (Task: ${res.task_id})`, 3000);
+                              }
+                          } catch (e) {
+                              console.error(e);
+                              toast.error("翻译失败 " + String(e));
+                          }
+                      }
+                  },
+                  { separator: true, label: "", onClick: () => {} },
+                  {
+                    label: "📋 复制选中字幕 (SRT)",
+                    onClick: async () => {
+                        const selected = regionsRef.current.filter(r => targetSelectedIds.includes(String(r.id)));
+                        if (selected.length === 0) return;
+                        
+                        // Generate SRT block for selected
+                        const srtBlock = selected.map((seg, idx) => {
+                            return `${idx + 1}\n${formatSRTTime(seg.start)} --> ${formatSRTTime(seg.end)}\n${seg.text}`;
+                        }).join("\n\n");
+                        
+                        try {
+                            await navigator.clipboard.writeText(srtBlock);
+                            const { toast } = await import("../utils/toast");
+                            toast.success(`已复制 ${selected.length} 条字幕到剪贴板`);
+                        } catch (e) {
+                            console.error("Copy failed", e);
+                            alert("复制失败，请检查浏览器权限");
+                        }
+                    }
+                  },
+                  {
+                    label: "✂️ 粘贴并替换 (Replace)",
+                    onClick: async () => {
+                        const { toast } = await import("../utils/toast");
+                        try {
+                            const text = await navigator.clipboard.readText();
+                            if (!text.trim()) {
+                                toast.error("剪贴板为空");
+                                return;
+                            }
+                            
+                            // Parse Clipboard
+                            // Try parsing as SRT first using our parser?
+                            // But our parser expects full file. Let's try it.
+                            const { parseSRT } = await import("../utils/subtitleParser");
+                            let parsed = parseSRT(text);
+                            
+                            // If parseSRT returns empty or weird results (e.g. if text is just lines without timestamps), 
+                            // we might need a fallback.
+                            // However, user said they will "translate externally", implying they copy SRT, translate, and paste back SRT or text lines.
+                            // If they paste plain text lines, parseSRT might return nothing.
+                            
+                            let newTexts: string[] = [];
+                            
+                            if (parsed.length > 0) {
+                                newTexts = parsed.map(p => p.text);
+                            } else {
+                                // Fallback: Split by lines, ignoring empty
+                                newTexts = text.split('\n').map(l => l.trim()).filter(l => l);
+                            }
+                            
+                            const selectedIds = targetSelectedIds.map(String);
+                            // Logic: 
+                            // If we have N selected and M pasted.
+                            // We replace the first min(N, M) selected segments.
+                            // We do NOT change timestamps, only text (as per "replace" workflow usually)
+                            
+                            const count = Math.min(newTexts.length, selectedIds.length);
+                            if (count === 0) {
+                                toast.error("无法解析剪贴板内容 或 未选中字幕");
+                                return;
+                            }
+                            
+                            const updates: any[] = [];
+                            for(let i=0; i<count; i++) {
+                                updates.push({
+                                    id: selectedIds[i],
+                                    text: newTexts[i]
+                                });
+                            }
+                            
+                            updateSegments(updates);
+                            toast.success(`已替换 ${count} 条字幕内容`);
+                            
+                        } catch (e) {
+                            console.error("Paste failed", e);
+                            toast.error("读取剪贴板失败: " + String(e));
+                        }
+                    }
                   },
                   { separator: true, label: "", onClick: () => {} }
               ];

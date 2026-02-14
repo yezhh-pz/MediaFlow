@@ -159,3 +159,29 @@ class AudioProcessor:
                 logger.error(f"Failed to create chunk {idx}: {e}")
                 
         return chunks
+
+    @staticmethod
+    def extract_segment(audio_path: str, start: float, end: float, output_path: str) -> str:
+        """
+        Extract a specific segment from audio file.
+        Returns the path to the extracted file.
+        """
+        if not Path(audio_path).exists():
+            raise FileNotFoundError(f"Audio file not found: {audio_path}")
+
+        duration = end - start
+        if duration <= 0:
+            raise ValueError("End time must be greater than start time")
+
+        cmd = [
+            settings.FFMPEG_PATH, "-y",
+            "-i", audio_path,
+            "-ss", f"{start:.3f}",
+            "-t", f"{duration:.3f}",
+            "-c:a", "libmp3lame", "-q:a", "4", # Re-encode for safety
+            str(output_path)
+        ]
+
+        logger.info(f"Extracting segment: {start:.2f}-{end:.2f} to {output_path}")
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, shell=False)
+        return str(output_path)

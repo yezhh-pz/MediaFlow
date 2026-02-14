@@ -35,6 +35,8 @@ interface EditorState {
   mergeSegments: (ids: string[]) => void;
   splitSegment: (currentTime: number, targetId?: string) => void;
   addSegment: (segment: SubtitleSegment) => void;
+  addSegments: (segments: SubtitleSegment[]) => void;
+  updateSegments: (segments: SubtitleSegment[]) => void;
   updateRegion: (id: string, updates: Partial<SubtitleSegment>) => void;
   updateRegionText: (id: string, text: string) => void;
   selectSegment: (id: string, multi: boolean, range: boolean) => void;
@@ -248,6 +250,36 @@ export const useEditorStore = create<EditorState>()(
             activeSegmentId: String(segment.id),
             selectedIds: [String(segment.id)],
           };
+        });
+      },
+
+      addSegments: (segments) => {
+        if (segments.length === 0) return;
+        get().snapshot();
+        set((state) => {
+          const newRegions = [...state.regions, ...segments].sort(
+            (a, b) => a.start - b.start,
+          );
+          // Select all new segments
+          const newIds = segments.map((s) => String(s.id));
+          return {
+            regions: newRegions,
+            activeSegmentId: newIds[0],
+            selectedIds: newIds,
+          };
+        });
+      },
+
+      updateSegments: (segments) => {
+        if (segments.length === 0) return;
+        get().snapshot();
+        set((state) => {
+          const updateMap = new Map(segments.map((s) => [String(s.id), s]));
+          const newRegions = state.regions.map((r) => {
+            const update = updateMap.get(String(r.id));
+            return update ? { ...r, ...update } : r;
+          });
+          return { regions: newRegions };
         });
       },
 
