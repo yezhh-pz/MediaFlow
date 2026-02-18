@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.services.task_manager import TaskManager
-from src.models.task_model import Task
-import src.core.database as db_module
+from backend.services.task_manager import TaskManager
+from backend.models.task_model import Task
+import backend.core.database as db_module
 
 # Test DB URL
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"

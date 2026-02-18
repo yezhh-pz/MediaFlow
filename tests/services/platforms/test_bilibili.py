@@ -1,7 +1,7 @@
 import pytest
 import respx
 from httpx import Response
-from src.services.platforms.bilibili import BilibiliPlatform
+from backend.services.platforms.bilibili import BilibiliPlatform
 
 @pytest.fixture
 def bilibili_platform():

@@ -7,8 +7,8 @@ from loguru import logger
 # Add project root to path
 sys.path.append(os.getcwd())
 
-from src.services.video_synthesizer import VideoSynthesizer
-from src.config import settings
+from backend.services.video_synthesizer import VideoSynthesizer
+from backend.config import settings
 
 def create_dummy_srt(path):
     content = """1

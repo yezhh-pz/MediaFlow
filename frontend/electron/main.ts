@@ -1,7 +1,6 @@
 /// <reference types="node" />
-/// <reference types="node" />
-const { app, BrowserWindow } = require("electron");
-const path = require("path");
+import { app, BrowserWindow, Menu, shell } from "electron";
+import path from "path";
 
 // ─── IPC Handler Registration ───────────────────────────────────
 // Each module exports a register function that sets up its IPC handlers.
@@ -41,8 +40,7 @@ function createWindow() {
   }
 
   // Application Menu
-  const { Menu } = require("electron");
-  const template = [
+  const template: Electron.MenuItemConstructorOptions[] = [
     {
       label: "File",
       submenu: [{ role: "quit" }],
@@ -61,7 +59,6 @@ function createWindow() {
         {
           label: "Open API Docs",
           click: async () => {
-            const { shell } = require("electron");
             await shell.openExternal("http://localhost:8000/docs");
           },
         },

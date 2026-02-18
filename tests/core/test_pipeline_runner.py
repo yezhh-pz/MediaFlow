@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from src.core.pipeline import PipelineRunner
-from src.core.context import PipelineContext
-from src.models.schemas import PipelineStepRequest, DownloadStepRequest, DownloadParams
-from src.core.steps.registry import StepRegistry
+from backend.core.pipeline import PipelineRunner
+from backend.core.context import PipelineContext
+from backend.models.schemas import PipelineStepRequest, DownloadStepRequest, DownloadParams
+from backend.core.steps.registry import StepRegistry
 
 @pytest.mark.asyncio
 async def test_pipeline_runner_success():

@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
-from src.main import app
-from src.core.container import container, Services
+from backend.main import app
+from backend.core.container import container, Services
 from unittest.mock import MagicMock
 
 @pytest.fixture

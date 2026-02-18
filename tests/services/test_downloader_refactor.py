@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
-from src.services.downloader import downloader_service
-from src.services.platforms.base import BasePlatform
-from src.models.schemas import AnalyzeResult, MediaAsset
+from backend.services.downloader import downloader_service
+from backend.services.platforms.base import BasePlatform
+from backend.models.schemas import AnalyzeResult, MediaAsset
 
 @pytest.mark.asyncio
 async def test_download_uses_strategy():

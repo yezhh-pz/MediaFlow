@@ -4,6 +4,7 @@ export interface EnhanceRequest {
   video_path: string;
   model?: string;
   scale?: string;
+  method?: string;
 }
 
 export interface CleanRequest {
@@ -22,16 +23,12 @@ export const preprocessingService = {
   enhanceVideo: async (
     data: EnhanceRequest,
   ): Promise<PreprocessingResponse> => {
-    return apiClient.post<PreprocessingResponse>(
-      "/api/v1/preprocessing/enhance",
-      data,
-    );
+    // @ts-ignore - Assuming TaskResponse is compatible or we cast it
+    return apiClient.enhanceVideo(data) as unknown as PreprocessingResponse;
   },
 
   cleanVideo: async (data: CleanRequest): Promise<PreprocessingResponse> => {
-    return apiClient.post<PreprocessingResponse>(
-      "/api/v1/preprocessing/clean",
-      data,
-    );
+    // @ts-ignore
+    return apiClient.cleanVideo(data) as unknown as PreprocessingResponse;
   },
 };

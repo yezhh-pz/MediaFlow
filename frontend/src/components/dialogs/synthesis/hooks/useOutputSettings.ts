@@ -17,6 +17,8 @@ export interface OutputSettingsState {
   setTrimStart: (v: number) => void;
   trimEnd: number;
   setTrimEnd: (v: number) => void;
+  targetResolution: string;
+  setTargetResolution: (v: string) => void;
 }
 
 export function useOutputSettings(
@@ -33,6 +35,7 @@ export function useOutputSettings(
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
   const [useGpu, setUseGpu] = useState(true);
+  const [targetResolution, setTargetResolution] = useState("original");
 
   // --- Restore quality ---
   useEffect(() => {
@@ -69,6 +72,19 @@ export function useOutputSettings(
     if (!isInitialized.current) return;
     localStorage.setItem("synthesis_use_gpu", String(useGpu));
   }, [useGpu]);
+
+  // --- Restore Resolution preference ---
+  useEffect(() => {
+    if (!isOpen) return;
+    const saved = localStorage.getItem("synthesis_target_resolution");
+    if (saved !== null) setTargetResolution(saved);
+  }, [isOpen]);
+
+  // --- Persist Resolution preference ---
+  useEffect(() => {
+    if (!isInitialized.current) return;
+    localStorage.setItem("synthesis_target_resolution", targetResolution);
+  }, [targetResolution]);
 
   // --- Initialize output path from video path ---
   useEffect(() => {
@@ -122,5 +138,7 @@ export function useOutputSettings(
     setTrimStart,
     trimEnd,
     setTrimEnd,
+    targetResolution,
+    setTargetResolution,
   };
 }

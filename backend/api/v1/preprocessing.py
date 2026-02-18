@@ -1,0 +1,179 @@
+from fastapi import APIRouter, HTTPException, BackgroundTasks
+from pydantic import BaseModel
+from typing import Optional, List
+from pathlib import Path
+import uuid
+import logging
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+# --- Data Models ---
+
+class EnhanceRequest(BaseModel):
+    video_path: str
+    model: Optional[str] = None # Allow None to use backend default
+    scale: str = "4x"
+    method: str = "realesrgan" # realesrgan | basicvsr
+
+class CleanRequest(BaseModel):
+    video_path: str
+    roi: List[int] # [x, y, w, h]
+    method: str = "telea"
+
+class PreprocessingResponse(BaseModel):
+    task_id: str
+    status: str
+    message: str
+
+# --- Endpoints ---
+
+from backend.core.container import container, Services
+from backend.core.task_runner import BackgroundTaskRunner
+from backend.models.schemas import TaskResult, FileRef
+import os
+
+def _get_enhancer():
+    return container.get(Services.ENHANCER)
+
+def _get_cleaner():
+    return container.get(Services.CLEANER)
+
+def _get_task_manager():
+    return container.get(Services.TASK_MANAGER)
+
+@router.post("/enhance", response_model=PreprocessingResponse)
+async def enhance_video(request: EnhanceRequest, background_tasks: BackgroundTasks):
+    """
+    Video Enhancement (Super Resolution) using Real-ESRGAN or BasicVSR++.
+    """
+    from backend.utils.path_validator import validate_path
+    validate_path(request.video_path, "video_path")
+
+    enhancer = _get_enhancer()
+    tm = _get_task_manager()
+    
+    # 1. Check availability
+    if not enhancer.is_available(request.method):
+        detail = "Real-ESRGAN binary not found." if request.method == "realesrgan" else "BasicVSR++ dependencies (mmmagic, cuda) not found."
+        raise HTTPException(status_code=503, detail=detail)
+
+    if not os.path.exists(request.video_path):
+        raise HTTPException(status_code=404, detail=f"Video file not found: {request.video_path}")
+
+    # 2. Determine output path
+    p = Path(request.video_path)
+    # Parse scale (e.g. "4x" -> 4)
+    try:
+        scale_val = int(request.scale.lower().replace('x', ''))
+    except (ValueError, AttributeError):
+        scale_val = 4
+        
+    output_filename = f"{p.stem}_{request.method}_{scale_val}x{p.suffix}"
+    output_path = p.parent / output_filename
+
+    # 3. Create Task
+    task_name = f"Enhance {p.name} ({request.method} {request.scale})"
+    task_id = await tm.create_task(
+        task_type="enhancement",
+        initial_message=f"Initializing {request.method}...",
+        task_name=task_name,
+        request_params=request.dict()
+    )
+
+    # 4. Result Transformer
+    def transform_result(path):
+        return TaskResult(
+            success=True,
+            files=[FileRef(type="video", path=path, label="upscaled_video")],
+            meta={
+                "video_path": path,
+                "original_path": request.video_path,
+                "model": request.model,
+                "scale": scale_val,
+                "method": request.method
+            }
+        ).dict()
+
+    # 5. Run in Background
+    background_tasks.add_task(
+        BackgroundTaskRunner.run,
+        task_id=task_id,
+        worker_fn=enhancer.upscale,
+        worker_kwargs={
+            "input_path": request.video_path,
+            "output_path": str(output_path),
+            "model": request.model,
+            "scale": scale_val,
+            "method": request.method
+        },
+        start_message=f"Running {request.method}...",
+        success_message="Upscaling complete",
+        result_transformer=transform_result
+    )
+
+    return PreprocessingResponse(
+        task_id=task_id,
+        status="queued",
+        message=f"Enhancement started (Task {task_id})"
+    )
+
+@router.post("/clean", response_model=PreprocessingResponse)
+async def clean_video(
+    request: CleanRequest,
+    background_tasks: BackgroundTasks
+):
+    """
+    Video Cleanup (Watermark Removal) using OpenCV or ProPainter.
+    """
+    from backend.utils.path_validator import validate_path
+    validate_path(request.video_path, "video_path")
+
+    cleaner = _get_cleaner()
+    tm = _get_task_manager()
+    
+    p = Path(request.video_path)
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="Video file not found")
+        
+    method = request.method or "telea"
+    output_path = p.with_name(f"{p.stem}_cleaned_{method}{p.suffix}")
+    
+    task_id = await tm.create_task(
+        task_type="cleanup",
+        initial_message="Queued for Cleanup",
+        task_name=f"Clean {p.name}",
+        request_params=request.dict()
+    )
+    
+    def save_result(out_path):
+        return TaskResult(
+            success=True,
+            files=[FileRef(type="video", path=out_path, label="cleaned")],
+            meta={"video_path": out_path}
+        ).dict()
+        
+    # Validation logic for ROI?
+    # CleanerService handles it.
+    
+    background_tasks.add_task(
+        BackgroundTaskRunner.run,
+        task_id=task_id,
+        worker_fn=cleaner.clean_video,
+        worker_kwargs={
+            "input_path": request.video_path,
+            "output_path": str(output_path),
+            "roi": request.roi,
+            "method": method
+        },
+        start_message=f"Running Watermark Removal ({method})...",
+        success_message="Cleanup complete",
+        result_transformer=save_result
+    )
+
+    return PreprocessingResponse(
+        task_id=task_id,
+        status="queued",
+        message=f"Cleanup started (Task {task_id})"
+    )

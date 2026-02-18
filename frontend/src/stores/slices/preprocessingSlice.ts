@@ -15,8 +15,16 @@ export interface PreprocessingSlice {
   enhanceModel: string;
   setEnhanceModel: (model: string) => void;
 
+  enhanceScale: string;
+  setEnhanceScale: (scale: string) => void;
+
+  enhanceMethod: string;
+  setEnhanceMethod: (method: string) => void;
+
   ocrEngine: string;
   setOcrEngine: (engine: string) => void;
+  cleanMethod: string;
+  setCleanMethod: (method: string) => void;
 
   // File State
   preprocessingFiles: ProjectFile[];
@@ -40,8 +48,17 @@ export const createPreprocessingSlice: StateCreator<PreprocessingSlice> = (
   enhanceModel: "RealESRGAN-x4plus",
   setEnhanceModel: (model) => set({ enhanceModel: model }),
 
+  enhanceScale: "4x",
+  setEnhanceScale: (scale) => set({ enhanceScale: scale }),
+
+  enhanceMethod: "realesrgan",
+  setEnhanceMethod: (method) => set({ enhanceMethod: method }),
+
   ocrEngine: "rapid",
   setOcrEngine: (engine) => set({ ocrEngine: engine }),
+
+  cleanMethod: "telea",
+  setCleanMethod: (method) => set({ cleanMethod: method }),
 
   preprocessingFiles: [],
   addPreprocessingFile: (file) =>

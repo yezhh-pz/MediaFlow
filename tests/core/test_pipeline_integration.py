@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from src.core.pipeline import PipelineRunner
-from src.models.schemas import PipelineStepRequest, MediaAsset, TranscribeResponse, SubtitleSegment
-from src.services.task_manager import task_manager
+from backend.core.pipeline import PipelineRunner
+from backend.models.schemas import PipelineStepRequest, MediaAsset, TranscribeResponse, SubtitleSegment
+from backend.services.task_manager import task_manager
 
 @pytest.mark.asyncio
 async def test_pipeline_orchestration_flow():

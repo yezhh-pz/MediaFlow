@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
-from src.main import app
-from src.services.task_manager import task_manager
-from src.models.schemas import TranscribeResponse, SubtitleSegment
+from backend.main import app
+from backend.services.task_manager import task_manager
+from backend.models.schemas import TranscribeResponse, SubtitleSegment
 import time
 
 def test_transcribe_flow_integration(client, tmp_path):

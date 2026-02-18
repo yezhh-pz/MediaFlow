@@ -6,31 +6,33 @@ import { FindReplaceDialog } from "../components/dialogs/FindReplaceDialog";
 import { SynthesisDialog } from "../components/dialogs/SynthesisDialog";
 import { ContextMenu, type ContextMenuItem } from "../components/ui/ContextMenu";
 import { apiClient } from "../api/client";
-import { formatSRTTime } from "../utils/subtitleParser";
 
 // Extracted Components
 import { EditorHeader } from "../components/editor/EditorHeader";
 import { VideoPreview } from "../components/editor/VideoPreview";
 
 // Custom Hooks
-// Custom Hooks
 import { useEditorIO } from "../hooks/editor/useEditorIO";
 import { useEditorShortcuts } from "../hooks/editor/useEditorShortcuts";
+import { useEditorActions } from "../hooks/editor/useEditorActions";
+import { useContextMenuBuilder } from "../hooks/editor/useContextMenuBuilder";
 import { useEditorStore } from "../stores/editorStore";
 
 export function EditorPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  
-  // --- UI State ---
+
+  // ── UI State ────────────────────────────────────────────────
   const [autoScroll, setAutoScroll] = useState(true);
   const [peaks, setPeaks] = useState<any>(null);
+  const [showFindReplace, setShowFindReplace] = useState(false);
+  const [showSynthesis, setShowSynthesis] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
       position: { x: number; y: number };
       items: ContextMenuItem[];
       targetId?: string;
   } | null>(null);
 
-  // --- Domain Logic (Zustand Store) ---
+  // ── Store ───────────────────────────────────────────────────
   const regions = useEditorStore(state => state.regions);
   const setRegions = useEditorStore(state => state.setRegions);
   const activeSegmentId = useEditorStore(state => state.activeSegmentId);
@@ -48,437 +50,66 @@ export function EditorPage() {
   const addSegments = useEditorStore(state => state.addSegments);
   const updateSegments = useEditorStore(state => state.updateSegments);
 
+  // ── IO Hook ─────────────────────────────────────────────────
   const {
-      mediaUrl,
-      openFile,
-      savePeaks,
-      saveSubtitleFile,
-      detectSilence,
-      isReady,
-      currentFilePath,
-      loadVideo,
-      loadSubtitleFromPath
+      mediaUrl, openFile, savePeaks, saveSubtitleFile,
+      detectSilence, isReady, currentFilePath,
+      loadVideo, loadSubtitleFromPath,
   } = useEditorIO(setPeaks);
 
-  // --- Persistence & Safety ---
+  // ── Action Hooks ────────────────────────────────────────────
+  const { handleSave, handleTranslate, handleSmartSplit } = useEditorActions({
+      currentFilePath, regions, saveSubtitleFile,
+      detectSilence, setRegions, videoRef,
+  });
 
-  // Ref for 'regions' current value for beforeunload without triggering effect re-run
+  const { handleContextMenu } = useContextMenuBuilder({
+      regions, selectedIds, currentFilePath, videoRef,
+      selectSegment, addSegment, addSegments, updateSegments,
+      mergeSegments, splitSegment, deleteSegments, setContextMenu,
+  });
+
+  // ── Shortcuts ───────────────────────────────────────────────
+  useEditorShortcuts({
+      videoRef, selectedIds, activeSegmentId,
+      undo, redo, deleteSegments, splitSegment,
+      onSave: handleSave,
+      onToggleFindReplace: () => setShowFindReplace(prev => !prev),
+  });
+
+  // ── Persistence & Safety ────────────────────────────────────
   const regionsRef = useRef(regions);
-  // const undoStackSizeRef = useRef(0); // REMOVED unused ref
-
   useEffect(() => {
     regionsRef.current = regions;
-    
-    // Auto-Save to LocalStorage
-    // ONLY if IO is ready (restoration complete)
-    if (isReady) {
-        localStorage.setItem("editor_last_subtitles", JSON.stringify(regions));
-    }
+    if (isReady) localStorage.setItem("editor_last_subtitles", JSON.stringify(regions));
   }, [regions, isReady]);
 
   useEffect(() => {
       const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-          if (regionsRef.current.length > 0) {
-              e.preventDefault();
-              e.returnValue = ''; // Chrome requires this
-          }
+          if (regionsRef.current.length > 0) { e.preventDefault(); e.returnValue = ''; }
       };
       window.addEventListener('beforeunload', handleBeforeUnload);
       return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
-  const handleSave = async () => {
-      try {
-          await saveSubtitleFile(regions);
-          alert("Saved successfully!");
-      } catch (e) {
-          alert("Failed to save file. See console.");
-      }
-  };
-
-  const handleTranslate = async () => {
-      if (!currentFilePath) return;
-
-      // 1. Force Save FIRST
-      try {
-          await saveSubtitleFile(regions);
-      } catch (e) {
-          console.error("Failed to save before translate", e);
-          if(!confirm("Failed to save subtitles. Continue with unsaved file?")) return;
-      }
-
-      // 2. Set Session Storage & Navigate
-      const srtPath = currentFilePath.replace(/\.[^.]+$/, '.srt');
-      
-      sessionStorage.setItem('mediaflow:pending_file', JSON.stringify({
-          video_path: currentFilePath,
-          subtitle_path: srtPath
-      }));
-      
-      window.dispatchEvent(new CustomEvent('mediaflow:navigate', { detail: 'translator' }));
-  };
-
-  const handleSmartSplit = async () => {
-        if (!confirm("Start Smart Split (Voice Detection)?\n\nThis will OVERWRITE segments based on detected voice activity (non-silence).")) return;
-        
-        try {
-            const silences = await detectSilence(); // returns [start, end][] of SILENCE
-            const duration = videoRef.current?.duration || 0;
-            
-            if (silences && silences.length > 0 && duration > 0) {
-                const speechSegments: {start: number, end: number}[] = [];
-                let lastEnd = 0;
-
-                // Invert silence to get speech
-                // Silence: [0, 2], [5, 8] -> Speech: [2, 5], [8, end]
-                // Logic: Speech is from (lastEnd) to (currentSilenceStart)
-                
-                silences.forEach(([silStart, silEnd]) => {
-                    if (silStart > lastEnd + 0.1) { // Min speech duration 0.1s
-                        speechSegments.push({ start: lastEnd, end: silStart });
-                    }
-                    lastEnd = Math.max(lastEnd, silEnd);
-                });
-
-                // Add final segment if there's audio after last silence
-                if (lastEnd < duration - 0.1) {
-                    speechSegments.push({ start: lastEnd, end: duration });
-                }
-
-                const newSegments = speechSegments.map((seg, idx) => ({
-                    id: String(idx + 1),
-                    start: seg.start,
-                    end: seg.end,
-                    text: "" 
-                }));
-                
-                setRegions(newSegments);
-            } else {
-                alert("No silence/speech pattern detected.");
-            }
-        } catch (e) {
-            alert("Failed to run detection. " + e);
-        }
-  };
-
-  // State for Find & Replace dialog (moved before hook call)
-  const [showFindReplace, setShowFindReplace] = useState(false);
-  const [showSynthesis, setShowSynthesis] = useState(false);
-
-  useEditorShortcuts({
-      videoRef,
-      selectedIds,
-      activeSegmentId,
-      undo,
-      redo,
-      deleteSegments,
-      splitSegment,
-      onSave: handleSave,
-      onToggleFindReplace: () => setShowFindReplace(prev => !prev)
-  });
-
-
-  // --- View Handlers ---
-
+  // ── View Handlers ───────────────────────────────────────────
   const handleRegionClick = useCallback((id: string, e?: MouseEvent | { ctrlKey: boolean, metaKey: boolean, shiftKey?: boolean, seek?: boolean }) => {
-      const isMulti = e?.ctrlKey || e?.metaKey || false;
-      const isRange = (e as any)?.shiftKey || false;
-      const shouldSeek = (e as any)?.seek || false;
-
-      selectSegment(id, isMulti, isRange);
-
-      if (shouldSeek && videoRef.current) {
-          const seg = regionsRef.current.find(r => r.id === id); // Use ref for latest regions without dependency
+      selectSegment(id, e?.ctrlKey || e?.metaKey || false, (e as any)?.shiftKey || false);
+      if ((e as any)?.seek && videoRef.current) {
+          const seg = regionsRef.current.find(r => r.id === id);
           if (seg) videoRef.current.currentTime = seg.start;
       }
-  }, [selectSegment]); // regionsRef is stable
+  }, [selectSegment]);
 
-
-  const handleContextMenu = useCallback((e: any, id: string, regionData?: {start: number, end: number}) => {
-      // 1. Check if ID exists (Is it a real segment?)
-      const existing = regionsRef.current.find(r => r.id === id);
-
-       if (!existing && regionData) {
-           // Temporary region created by drag
-           setContextMenu({
-               position: { x: e.clientX, y: e.clientY },
-               targetId: id,
-               items: [
-                   {
-                       label: "在此处插入空白字幕",
-                       onClick: () => {
-                           const newId = String(Date.now());
-                           addSegment({
-                               id: newId,
-                               start: regionData.start,
-                               end: regionData.end,
-                               text: "" 
-                           });
-                           // Select it immediately
-                           setTimeout(() => selectSegment(newId, false, false), 50);
-                       }
-                   },
-                   {
-                        label: "🎙️ 识别选中区域 (ASR)",
-                        onClick: async () => {
-                            if (!currentFilePath) {
-                                alert("请先保存或打开一个文件");
-                                return;
-                            }
-                            
-                            // Dynamically import toast
-                            const { toast } = await import("../utils/toast");
-                            toast.info("正在识别片段...", 2000);
-
-                            try {
-                                const res = await apiClient.transcribeSegment({
-                                    video_path: "", 
-                                    audio_path: currentFilePath, 
-                                    srt_path: "", 
-                                    watermark_path: null,
-                                    start: regionData.start,
-                                    end: regionData.end,
-                                    options: {}
-                                });
-
-                                if (res.status === 'completed' && res.data) {
-                                    const { segments, text } = res.data;
-                                    
-                                    if (segments && segments.length > 0) {
-                                        // Use granular segments
-                                        const newSegments = segments.map((seg: any, idx: number) => ({
-                                            id: String(Date.now() + idx),
-                                            start: seg.start,
-                                            end: seg.end,
-                                            text: seg.text.trim()
-                                        }));
-                                        
-                                        addSegments(newSegments);
-                                        toast.success(`成功识别 ${newSegments.length} 个片段`);
-                                    } else {
-                                        // Fallback to single block
-                                        const newId = String(Date.now());
-                                        const fullText = text.trim();
-                                        
-                                        addSegment({
-                                            id: newId,
-                                            start: regionData.start,
-                                            end: regionData.end,
-                                            text: fullText || "[无语音]"
-                                        });
-                                        
-                                        setTimeout(() => selectSegment(newId, false, false), 50);
-                                        toast.success("识别成功");
-                                    }
-                                } else {
-                                    // Pending or Other
-                                    toast.info(`片段较长，后台处理中... (Task: ${res.task_id})`, 5000);
-                                }
-                            } catch (e) {
-                                console.error(e);
-                                toast.error("识别失败: " + String(e));
-                            }
-                        }
-                   },
-                   { separator: true, label: "", onClick: () => {} },
-                   { label: "取消", onClick: () => {} }
-               ]
-           });
-           return;
-      }
-
-      // Logic: If right click on unselected, select it.
-      if (!selectedIds.includes(id)) {
-          selectSegment(id, false, false);
-      }
-      
-      // Determine selection
-      const isSelected = selectedIds.includes(id);
-      const targetSelectedIds = isSelected ? selectedIds : [id];
-
-      // Check continuity
-      const indices = targetSelectedIds.map(sid => regionsRef.current.findIndex(r => r.id === sid)).sort((a,b) => a-b);
-      let isContinuous = targetSelectedIds.length >= 2;
-      for (let i = 0; i < indices.length - 1; i++) {
-          if (indices[i+1] !== indices[i] + 1) isContinuous = false;
-      }
-
-      setContextMenu({
-          position: { x: e.clientX, y: e.clientY },
-          targetId: id,
-          items: (() => {
-              const menu: any[] = [
-                  {
-                      label: "播放此片段",
-                      onClick: () => {
-                          const seg = regionsRef.current.find(r => r.id === id);
-                          if (seg && videoRef.current) {
-                              videoRef.current.currentTime = seg.start;
-                              videoRef.current.play();
-                          }
-                      }
-                  },
-                  {
-                      label: "🌐 翻译选中区域 (LLM)",
-                      onClick: async () => {
-                          const selected = regionsRef.current.filter(r => targetSelectedIds.includes(String(r.id)));
-                          if (selected.length === 0) return;
-                          
-                          const { toast } = await import("../utils/toast");
-                          toast.info("正在翻译...", 2000);
-                          
-                          try {
-                              const res = await apiClient.translateSegments({
-                                  segments: selected,
-                                  target_language: "Chinese" 
-                              });
-                              
-                              if (res.status === 'completed' && res.segments) {
-                                  updateSegments(res.segments);
-                                  toast.success("翻译完成");
-                              } else {
-                                  toast.info(`任务处理中 (Task: ${res.task_id})`, 3000);
-                              }
-                          } catch (e) {
-                              console.error(e);
-                              toast.error("翻译失败 " + String(e));
-                          }
-                      }
-                  },
-                  { separator: true, label: "", onClick: () => {} },
-                  {
-                    label: "📋 复制选中字幕 (SRT)",
-                    onClick: async () => {
-                        const selected = regionsRef.current.filter(r => targetSelectedIds.includes(String(r.id)));
-                        if (selected.length === 0) return;
-                        
-                        // Generate SRT block for selected
-                        const srtBlock = selected.map((seg, idx) => {
-                            return `${idx + 1}\n${formatSRTTime(seg.start)} --> ${formatSRTTime(seg.end)}\n${seg.text}`;
-                        }).join("\n\n");
-                        
-                        try {
-                            await navigator.clipboard.writeText(srtBlock);
-                            const { toast } = await import("../utils/toast");
-                            toast.success(`已复制 ${selected.length} 条字幕到剪贴板`);
-                        } catch (e) {
-                            console.error("Copy failed", e);
-                            alert("复制失败，请检查浏览器权限");
-                        }
-                    }
-                  },
-                  {
-                    label: "✂️ 粘贴并替换 (Replace)",
-                    onClick: async () => {
-                        const { toast } = await import("../utils/toast");
-                        try {
-                            const text = await navigator.clipboard.readText();
-                            if (!text.trim()) {
-                                toast.error("剪贴板为空");
-                                return;
-                            }
-                            
-                            // Parse Clipboard
-                            // Try parsing as SRT first using our parser?
-                            // But our parser expects full file. Let's try it.
-                            const { parseSRT } = await import("../utils/subtitleParser");
-                            let parsed = parseSRT(text);
-                            
-                            // If parseSRT returns empty or weird results (e.g. if text is just lines without timestamps), 
-                            // we might need a fallback.
-                            // However, user said they will "translate externally", implying they copy SRT, translate, and paste back SRT or text lines.
-                            // If they paste plain text lines, parseSRT might return nothing.
-                            
-                            let newTexts: string[] = [];
-                            
-                            if (parsed.length > 0) {
-                                newTexts = parsed.map(p => p.text);
-                            } else {
-                                // Fallback: Split by lines, ignoring empty
-                                newTexts = text.split('\n').map(l => l.trim()).filter(l => l);
-                            }
-                            
-                            const selectedIds = targetSelectedIds.map(String);
-                            // Logic: 
-                            // If we have N selected and M pasted.
-                            // We replace the first min(N, M) selected segments.
-                            // We do NOT change timestamps, only text (as per "replace" workflow usually)
-                            
-                            const count = Math.min(newTexts.length, selectedIds.length);
-                            if (count === 0) {
-                                toast.error("无法解析剪贴板内容 或 未选中字幕");
-                                return;
-                            }
-                            
-                            const updates: any[] = [];
-                            for(let i=0; i<count; i++) {
-                                updates.push({
-                                    id: selectedIds[i],
-                                    text: newTexts[i]
-                                });
-                            }
-                            
-                            updateSegments(updates);
-                            toast.success(`已替换 ${count} 条字幕内容`);
-                            
-                        } catch (e) {
-                            console.error("Paste failed", e);
-                            toast.error("读取剪贴板失败: " + String(e));
-                        }
-                    }
-                  },
-                  { separator: true, label: "", onClick: () => {} }
-              ];
-
-              if (isContinuous) {
-                   menu.push({
-                      label: `合并 ${targetSelectedIds.length} 个片段`,
-                      disabled: false,
-                      onClick: () => mergeSegments(targetSelectedIds)
-                  });
-              }
-
-              menu.push({
-                  label: "分割",
-                  onClick: () => {
-                      if (videoRef.current) {
-                          splitSegment(videoRef.current.currentTime, id);
-                      }
-                  }
-              });
-
-              menu.push({ separator: true, label: "", onClick: () => {} });
-
-              menu.push({
-                  label: "删除",
-                  danger: true,
-                  onClick: () => {
-                      if(confirm(`确定删除这 ${targetSelectedIds.length} 项吗?`)) {
-                           deleteSegments(targetSelectedIds);
-                      }
-                  }
-              });
-
-              return menu;
-          })()
-      });
-  }, [selectedIds, selectSegment, mergeSegments, splitSegment, deleteSegments, addSegment]); // regionsRef stable
-
-  // Detail Editor Helper
-  const activeSegment = regions.find(r => r.id === activeSegmentId);
-  const displaySegment = activeSegment; // Removed fallback to regions[0]
+  // Detail Editor
+  const displaySegment = regions.find(r => r.id === activeSegmentId);
   const handleDetailUpdate = (field: 'start' | 'end' | 'text', value: string | number) => {
       if (!displaySegment) return;
       const id = String(displaySegment.id);
-
       if (field === 'text') {
-          // Use the specific text updater which handles history
           updateRegionText(id, value as string);
       } else {
-          // For start/end manual edits, we want to save a snapshot first
-          // because updateRegion implies "drag/continuous update" and doesn't save history by itself
-          snapshot();
-          snapshot();
+          snapshot(); snapshot();
           updateRegion(id, { [field]: value });
       }
   };
@@ -487,113 +118,69 @@ export function EditorPage() {
       updateRegion(id, { start, end });
   }, [updateRegion]);
 
-  // --- Drag and Drop Handlers ---
+  // ── Drag & Drop ─────────────────────────────────────────────
   const handleVideoDrop = useCallback(async (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault(); e.stopPropagation();
       const file = e.dataTransfer.files[0];
       if (file && (file.type.startsWith('video/') || file.type.startsWith('audio/') || file.name.endsWith('.mkv'))) {
-          // Get path via Electron if available
-          let path = (file as any).path; 
-          if (!path && window.electronAPI?.getPathForFile) {
-               path = window.electronAPI.getPathForFile(file);
-          }
-          if (path) {
-              await loadVideo(path);
-          }
+          let path = (file as any).path;
+          if (!path && window.electronAPI?.getPathForFile) path = window.electronAPI.getPathForFile(file);
+          if (path) await loadVideo(path);
       }
   }, [loadVideo]);
 
   const handleSubtitleDrop = useCallback(async (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault(); e.stopPropagation();
       const file = e.dataTransfer.files[0];
       if (file && (file.name.endsWith('.srt') || file.name.endsWith('.vtt') || file.name.endsWith('.ass'))) {
-          // Get path
-           let path = (file as any).path; 
-          if (!path && window.electronAPI?.getPathForFile) {
-               path = window.electronAPI.getPathForFile(file);
-          }
-          if (path) {
-              await loadSubtitleFromPath(path);
-          }
+          let path = (file as any).path;
+          if (!path && window.electronAPI?.getPathForFile) path = window.electronAPI.getPathForFile(file);
+          if (path) await loadSubtitleFromPath(path);
       }
   }, [loadSubtitleFromPath]);
 
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); };
 
-
-  const handleDragOver = (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-  };
-
-  // --- Playback Persistence ---
-  
-  // 1. Save on updates (Debounced or on Pause/Unload)
+  // ── Playback Persistence ────────────────────────────────────
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !currentFilePath) return;
-
-    const saveTime = () => {
-        const time = video.currentTime;
-        if (time > 0) {
-            localStorage.setItem(`playback_pos_${currentFilePath}`, String(time));
-        }
-    };
-
-    const handlePause = () => saveTime();
-    
-    // Save every 5s just in case of crash
+    const saveTime = () => { if (video.currentTime > 0) localStorage.setItem(`playback_pos_${currentFilePath}`, String(video.currentTime)); };
     const interval = setInterval(saveTime, 5000);
-
-    video.addEventListener('pause', handlePause);
-    
-    return () => {
-        saveTime(); // Save on unmount
-        clearInterval(interval);
-        video.removeEventListener('pause', handlePause);
-    };
+    video.addEventListener('pause', saveTime);
+    return () => { saveTime(); clearInterval(interval); video.removeEventListener('pause', saveTime); };
   }, [currentFilePath]);
 
-  // 2. Restore on Load
   const handleLoadedMetadata = useCallback(() => {
-      // Restore previous position
       if (currentFilePath && videoRef.current) {
           const saved = localStorage.getItem(`playback_pos_${currentFilePath}`);
           if (saved) {
               const time = parseFloat(saved);
-              if (!isNaN(time) && time > 0 && time < videoRef.current.duration) {
-                  videoRef.current.currentTime = time;
-                  // Optional: Toast notification "Resumed from ..."
-              }
+              if (!isNaN(time) && time > 0 && time < videoRef.current.duration) videoRef.current.currentTime = time;
           }
       }
   }, [currentFilePath]);
 
-
+  // ── Render ──────────────────────────────────────────────────
   return (
     <div className="h-screen w-full flex flex-col text-slate-100 overflow-hidden">
-        {/* Header */}
-        <EditorHeader 
+        <EditorHeader
             autoScroll={autoScroll}
             setAutoScroll={setAutoScroll}
             onOpenFile={openFile}
             onSave={handleSave}
+            onSaveAs={() => saveSubtitleFile(regions, true)}
             onSmartSplit={handleSmartSplit}
             onSynthesize={() => setShowSynthesis(true)}
             onTranslate={handleTranslate}
         />
 
-        {/* Main Workspace: Top Split */}
         <div className="flex-1 flex min-h-0 bg-[#0a0a0a] gap-[1px]">
              {/* Left: Subtitle List */}
-             <div 
-                className="w-1/3 min-w-[320px] max-w-[480px] flex flex-col bg-[#1a1a1a]"
-                onDrop={handleSubtitleDrop}
-                onDragOver={handleDragOver}
-             >
+             <div className="w-1/3 min-w-[320px] max-w-[480px] flex flex-col bg-[#1a1a1a]"
+                 onDrop={handleSubtitleDrop} onDragOver={handleDragOver}>
                  <div className="flex-1 min-h-0">
-                     <SubtitleList 
+                     <SubtitleList
                         segments={regions}
                         activeSegmentId={activeSegmentId}
                         autoScroll={autoScroll}
@@ -606,13 +193,11 @@ export function EditorPage() {
                             if (seg && videoRef.current) videoRef.current.currentTime = seg.start;
                         }}
                         onContextMenu={handleContextMenu}
-                        onAutoFix={(newSegments) => {
-                            setRegions(newSegments);
-                        }}
+                        onAutoFix={(newSegments) => setRegions(newSegments)}
                      />
                  </div>
-                 
-                 {/* Simplified Detail Editor (Below List) */}
+
+                 {/* Detail Editor */}
                  {displaySegment ? (
                     <div className="h-28 bg-[#1a1a1a] p-2 flex flex-col gap-1 border-t border-white/5 shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.5)] z-20">
                          <div className="flex justify-between items-center text-[10px] px-1 select-none">
@@ -626,7 +211,7 @@ export function EditorPage() {
                                 {((displaySegment.end - displaySegment.start).toFixed(2))}s
                              </span>
                          </div>
-                         <textarea 
+                         <textarea
                             value={displaySegment.text}
                             onChange={(e) => handleDetailUpdate('text', e.target.value)}
                             className="flex-1 w-full bg-black/20 border border-white/5 rounded-lg p-2 text-sm resize-none focus:outline-none focus:border-indigo-500/50 focus:bg-black/40 transition-all font-medium leading-normal text-slate-200 placeholder-slate-600/50"
@@ -639,14 +224,11 @@ export function EditorPage() {
                     </div>
                  )}
              </div>
-             
+
              {/* Right: Video Preview */}
-             <div 
-                className="flex-1 min-w-0 bg-[#1a1a1a] relative flex flex-col justify-center"
-                onDrop={handleVideoDrop}
-                onDragOver={handleDragOver}
-             >
-                <VideoPreview 
+             <div className="flex-1 min-w-0 bg-[#1a1a1a] relative flex flex-col justify-center"
+                 onDrop={handleVideoDrop} onDragOver={handleDragOver}>
+                <VideoPreview
                     mediaUrl={mediaUrl}
                     videoRef={videoRef}
                     regions={regions}
@@ -654,11 +236,11 @@ export function EditorPage() {
                 />
              </div>
         </div>
-        
+
         {/* Bottom: Waveform Timeline */}
         <div className="h-40 bg-[#1a1a1a] border-t border-white/5 relative z-30 shrink-0">
              {mediaUrl && (
-                 <WaveformPlayer 
+                 <WaveformPlayer
                     mediaUrl={mediaUrl}
                     videoRef={videoRef}
                     regions={regions}
@@ -673,59 +255,55 @@ export function EditorPage() {
                  />
              )}
         </div>
-        
-        {/* Context Menu */}
-        <ContextMenu 
+
+        <ContextMenu
             items={contextMenu?.items || []}
             position={contextMenu?.position || null}
             onClose={() => setContextMenu(null)}
         />
-        
-        {/* Find & Replace Dialog */}
-        <FindReplaceDialog 
+
+        <FindReplaceDialog
             isOpen={showFindReplace}
             onClose={() => setShowFindReplace(false)}
             regions={regions}
-            onSelectSegment={(id) => {
-                selectSegment(id, false, false);
-                // Also scroll/seek logic if needed? 
-                // Currently selectSegment updates activeId, SubtitleList autoScrolls to active.
-            }}
+            onSelectSegment={(id) => selectSegment(id, false, false)}
             onUpdateSegment={(id, text) => updateRegion(id, { text })}
         />
-        
-        {/* Synthesis Dialog */}
-        <SynthesisDialog 
+
+        <SynthesisDialog
             isOpen={showSynthesis}
             onClose={() => setShowSynthesis(false)}
             regions={regions}
             videoPath={currentFilePath || (mediaUrl ? mediaUrl.replace('file:///', '') : null)}
             mediaUrl={mediaUrl}
-            onSynthesize={async (options, videoPath, watermarkPath) => {
-                // 1. Force Save FIRST to ensure SRT file on disk matches Editor content
+            onSynthesize={async (options, _unusedVideoPath, watermarkPath) => {
+                let srtPath: string | false = false;
                 try {
-
-                    await saveSubtitleFile(regions); // This saves to video.srt
+                    srtPath = await saveSubtitleFile(regions);
                 } catch (e) {
                     console.error("[EditorPage] Failed to save subtitles before synthesis", e);
-                    if(!confirm("Failed to save subtitles. Synthesis will use the old file. Continue?")) {
-                        return;
-                    }
                 }
 
-                // 2. Trigger Synthesis
-                // We assume saveSubtitleFile saved to videoPath.replace(ext, .srt)
-                // So we derive srtPath same way
-                const srtPath = videoPath.replace(/\.[^.]+$/, '.srt');
-                const { output_path, ...restOptions } = options;
-                // console.log("[EditorPage] Starting synthesis with:", { videoPath, srtPath, output_path });
+                if (!srtPath) {
+                    if(!confirm("Failed to save subtitles. Synthesis might use an outdated file. Continue?")) return;
+                    // Fallback to guessing if save failed but user wants to proceed
+                    if (currentFilePath) {
+                        srtPath = currentFilePath.replace(/\.[^.]+$/, '.srt');
+                    }
+                }
                 
+                if (!srtPath || !currentFilePath) {
+                    alert("Cannot synthesize: Missing video or subtitle file.");
+                    return;
+                }
+
+                const { output_path, ...restOptions } = options;
                 await apiClient.synthesizeVideo({
-                    video_path: videoPath,
-                    srt_path: srtPath,
+                    video_path: currentFilePath,
+                    srt_path: srtPath as string,
                     watermark_path: watermarkPath,
                     output_path: output_path,
-                    options: restOptions
+                    options: restOptions,
                 });
             }}
         />

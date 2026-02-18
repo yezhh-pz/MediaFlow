@@ -89,6 +89,7 @@ export const SynthesisDialog: React.FC<SynthesisDialogProps> = ({
                 back_color: style.bgEnabled ? "&H80000000" : hexToAss(style.bgColor, bgAlphaHex), // Shadow
                 border_style: style.bgEnabled ? 3 : 1,
                 alignment: style.alignment,
+                multiline_align: style.multilineAlign,
                 margin_v: marginV,
                 wm_x: wmXExpr,
                 wm_y: wmYExpr,
@@ -98,6 +99,7 @@ export const SynthesisDialog: React.FC<SynthesisDialogProps> = ({
                 trim_end: output.trimEnd > 0 ? output.trimEnd : undefined,
                 video_width: videoSize.w || 1920,
                 video_height: videoSize.h || 1080,
+                target_resolution: output.targetResolution,
             };
 
             // Mix in Crop Params if enabled

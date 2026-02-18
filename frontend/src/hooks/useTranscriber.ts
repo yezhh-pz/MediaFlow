@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { apiClient } from "../api/client";
 import { useTaskContext } from "../context/TaskContext";
 import type { TranscribeResult } from "../types/transcriber";
+import type { ElectronFile } from "../types/electron";
 
 export function useTranscriber() {
   const { tasks } = useTaskContext();
@@ -25,7 +26,7 @@ export function useTranscriber() {
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [file, setFile] = useState<File | null>(() => {
+  const [file, setFile] = useState<ElectronFile | null>(() => {
     const saved = localStorage.getItem("transcriber_file");
     if (saved) {
       try {
@@ -35,7 +36,7 @@ export function useTranscriber() {
           path: meta.path,
           size: meta.size,
           type: "video/mp4", // Mock
-        } as unknown as File;
+        } as ElectronFile;
       } catch (e) {
         return null;
       }
@@ -56,12 +57,12 @@ export function useTranscriber() {
       localStorage.setItem("transcriber_result", JSON.stringify(result));
     else localStorage.removeItem("transcriber_result");
 
-    if (file && (file as any).path) {
+    if (file && file.path) {
       localStorage.setItem(
         "transcriber_file",
         JSON.stringify({
           name: file.name,
-          path: (file as any).path,
+          path: file.path,
           size: file.size,
         }),
       );
@@ -107,7 +108,11 @@ export function useTranscriber() {
               path: data.video_path,
               size: fileSize,
               type: "video/mp4",
-            } as unknown as File;
+            } as ElectronFile;
+
+            // FIX: Clear old results when loading new file from navigation
+            setResult(null);
+
             setFile(fakeFile);
           };
           loadFileWithSize();
@@ -163,8 +168,8 @@ export function useTranscriber() {
             text: meta.text || "",
             language: meta.language || "auto",
             srt_path: srtFile?.path,
-            video_path: (file as any)?.path, // Persist original video path
-            audio_path: (file as any)?.path,
+            video_path: file?.path, // Persist original video path
+            audio_path: file?.path,
           };
 
           setResult(mappedResult);
@@ -190,7 +195,7 @@ export function useTranscriber() {
     try {
       setIsUploading(true);
 
-      let filePath = (file as any).path;
+      let filePath = file.path;
       if (
         !filePath &&
         window.electronAPI &&
@@ -343,7 +348,7 @@ export function useTranscriber() {
         }
       }
       setResult(null); // Clear old results
-      setFile(droppedFile);
+      setFile(droppedFile as ElectronFile);
     }
   };
 
@@ -356,7 +361,7 @@ export function useTranscriber() {
           path: fileData.path,
           size: fileData.size,
           type: "video/mp4",
-        } as unknown as File;
+        } as ElectronFile;
         setResult(null); // Clear old results
         setFile(fakeFile);
       }
@@ -368,7 +373,7 @@ export function useTranscriber() {
         const files = (e.target as HTMLInputElement).files;
         if (files && files.length > 0) {
           setResult(null); // Clear old results
-          setFile(files[0]);
+          setFile(files[0] as ElectronFile);
         }
       };
       input.click();
@@ -381,7 +386,7 @@ export function useTranscriber() {
       setResult(null); // Clear old results when file changes
       localStorage.removeItem("transcriber_result");
     }
-    setFile(newFile);
+    setFile(newFile as ElectronFile | null);
   };
 
   return {

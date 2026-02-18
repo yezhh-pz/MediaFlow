@@ -21,7 +21,7 @@
 
 ```
 Mediaflow/
-├── src/                  # Python 后端 (FastAPI)
+├── backend/              # Python 后端 (FastAPI)
 │   ├── services/         # 核心业务逻辑 (转录, 翻译, 合成)
 │   ├── routers/          # API 路由
 │   └── utils/            # 工具库 (SubtitleManager, HashUtil)
@@ -45,7 +45,7 @@ Mediaflow/
 
 ```powershell
 # 推荐使用 Python 3.10+
-python -m uvicorn src.main:app --host 127.0.0.1 --port 8001 --reload
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8001 --reload
 ```
 
 ### 2. 前端启动 (Dev)

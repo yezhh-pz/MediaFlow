@@ -7,6 +7,7 @@ interface EditorHeaderProps {
     setAutoScroll: (enabled: boolean) => void;
     onOpenFile: () => void;
     onSave: () => void;
+    onSaveAs: () => void;
     onSmartSplit: () => Promise<void>;
     onSynthesize: () => void;
     onTranslate: () => void;
@@ -17,6 +18,7 @@ export function EditorHeader({
     setAutoScroll,
     onOpenFile,
     onSave,
+    onSaveAs,
     onSmartSplit,
     onSynthesize,
     onTranslate
@@ -99,10 +101,18 @@ export function EditorHeader({
 
                  <button 
                      onClick={onSave}
-                     className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-lg text-xs font-bold transition-all shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 active:scale-95 ml-1"
+                     className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-l-lg text-xs font-bold transition-all shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 active:scale-95 ml-1"
                  >
                      <Save size={16} /> Save
                  </button>
+                 <button 
+                     onClick={onSaveAs}
+                     className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-r-lg border-l border-indigo-700 text-xs font-bold transition-all shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 active:scale-95"
+                     title="Save As..."
+                 >
+                    <FolderOpen size={14} />
+                 </button>
+
             </div>
         </header>
     );

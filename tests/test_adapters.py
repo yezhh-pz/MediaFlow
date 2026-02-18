@@ -1,8 +1,8 @@
 import pytest
 import os
 from pathlib import Path
-from src.core.adapters.faster_whisper import FasterWhisperAdapter, FasterWhisperConfig
-from src.config import settings
+from backend.core.adapters.faster_whisper import FasterWhisperAdapter, FasterWhisperConfig
+from backend.config import settings
 
 # Mock settings for test
 settings.FASTER_WHISPER_CLI_PATH = "mock_cli.exe"

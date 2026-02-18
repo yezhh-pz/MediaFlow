@@ -67,11 +67,30 @@ export function useDownloaderController() {
   // Last successful analysis result (optional, for custom filename logic)
   const [lastAnalysis, setLastAnalysis] = useState<AnalyzeResult | null>(null);
 
-  // Debug Electron
-  useEffect(() => {
-    if (window.electronAPI) {
+  // ── Cookie Retry Helper ──────────────────────────────────────
+  const handleCookieRetry = async (domain: string): Promise<boolean> => {
+    if (!window.electronAPI?.fetchCookies) {
+      setError("需要登录验证，但 Electron API 不可用。请使用桌面版应用。");
+      return false;
     }
-  }, []);
+    setError(`正在打开浏览器，请在新窗口中访问网站，完成后关闭窗口...`);
+    try {
+      const cookies = await window.electronAPI.fetchCookies(
+        `https://www.${domain}`,
+      );
+      if (!cookies || cookies.length === 0) {
+        setError(`无法获取 ${domain} 的 Cookie。请尝试在浏览器中登录后重试。`);
+        return false;
+      }
+      await apiClient.saveCookies(domain, cookies);
+      setError(null);
+      return true;
+    } catch (cookieError: any) {
+      console.error("[Cookie] Fetch failed:", cookieError);
+      setError(`Cookie 获取失败: ${cookieError.message}`);
+      return false;
+    }
+  };
 
   const downloadVideos = useCallback(
     async (
@@ -248,47 +267,32 @@ export function useDownloaderController() {
       if (errorMessage.includes("COOKIES_REQUIRED:")) {
         const match = errorMessage.match(/COOKIES_REQUIRED:([a-zA-Z0-9.-]+)/);
         const domain = match?.[1];
-        if (domain && window.electronAPI?.fetchCookies) {
-          setError(`正在打开浏览器，请在新窗口中访问网站，完成后关闭窗口...`);
-          try {
-            const targetUrl = `https://www.${domain}`;
-            const cookies = await window.electronAPI.fetchCookies(targetUrl);
-
-            if (cookies && cookies.length > 0) {
-              await apiClient.saveCookies(domain, cookies);
-              setError(null);
-              // Retry Logic
-              const analysis = await apiClient.analyzeUrl(url);
-              setLastAnalysis(analysis);
-
-              if (
-                analysis.type === "playlist" &&
-                analysis.items &&
-                analysis.items.length > 1
-              ) {
-                setPlaylistInfo(analysis);
-                setSelectedItems([]);
-                setShowPlaylistDialog(true);
-              } else {
-                await downloadVideos(
-                  [analysis.url || url],
-                  undefined,
-                  analysis.extra_info,
-                );
-              }
-              setAnalyzing(false);
-              return;
+        if (domain) {
+          const cookieOk = await handleCookieRetry(domain);
+          if (cookieOk) {
+            // Retry analysis after successful cookie fetch
+            const analysis = await apiClient.analyzeUrl(url);
+            setLastAnalysis(analysis);
+            if (
+              analysis.type === "playlist" &&
+              analysis.items &&
+              analysis.items.length > 1
+            ) {
+              setPlaylistInfo(analysis);
+              setSelectedItems([]);
+              setShowPlaylistDialog(true);
             } else {
-              setError(
-                `无法获取 ${domain} 的 Cookie。请尝试在浏览器中登录后重试。`,
+              await downloadVideos(
+                [analysis.url || url],
+                undefined,
+                analysis.extra_info,
               );
             }
-          } catch (cookieError: any) {
-            console.error("[Cookie] Fetch failed:", cookieError);
-            setError(`Cookie 获取失败: ${cookieError.message}`);
+            setAnalyzing(false);
+            return;
           }
         } else {
-          setError("需要登录验证，但 Electron API 不可用。请使用桌面版应用。");
+          setError(errorMessage);
         }
       } else {
         setError(errorMessage);

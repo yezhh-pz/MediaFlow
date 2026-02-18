@@ -11,11 +11,15 @@ site-packages/
 
 # Generated/Large Directories
 temp/
+.temp/
+.benchmarks/
+.pytest_cache/
 models/
 example/
 output/
 bin/
 data/
+workspace/
 
 # Node
 node_modules/

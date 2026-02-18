@@ -7,11 +7,11 @@ from pathlib import Path
 # Add project root to path
 sys.path.append(str(Path(__file__).parents[1]))
 
-from src.core.pipeline import PipelineRunner
-from src.models.schemas import PipelineStepRequest
-from src.core.container import container, Services
-from src.services.task_manager import TaskManager
-from src.services.settings_manager import SettingsManager
+from backend.core.pipeline import PipelineRunner
+from backend.models.schemas import PipelineStepRequest
+from backend.core.container import container, Services
+from backend.services.task_manager import TaskManager
+from backend.services.settings_manager import SettingsManager
 
 # Mock/Stub dependencies if needed, or run integration test
 # We will try to run a "dry run" or minimal real run
@@ -36,8 +36,8 @@ async def main():
     # This script will serve as a "Backend Integration Test" for the steps we added.
     
     print("Checking if steps are registered...")
-    from src.core.steps.registry import StepRegistry
-    from src.core.steps import download, transcribe, translate, synthesize
+    from backend.core.steps.registry import StepRegistry
+    from backend.core.steps import download, transcribe, translate, synthesize
     
     steps = StepRegistry.list_steps()
     print(f"Registered steps: {steps}")

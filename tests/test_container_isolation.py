@@ -1,5 +1,5 @@
 """Quick test: ServiceContainer instance isolation after refactor."""
-from src.core.container import ServiceContainer, container
+from backend.core.container import ServiceContainer, container
 
 
 def test_instance_isolation():

@@ -6,7 +6,7 @@ from loguru import logger
 # Add project root to path
 sys.path.append(os.getcwd())
 
-from src.utils.subtitle_writer import SubtitleWriter
+from backend.utils.subtitle_writer import SubtitleWriter
 
 def create_dummy_srt(path):
     content = """1

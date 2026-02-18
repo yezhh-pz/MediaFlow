@@ -1,6 +1,6 @@
 // ── Subtitle Style Settings Panel (Left sidebar section) ──
 import React from 'react';
-import { Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Save, Trash2, X, MonitorPlay } from 'lucide-react';
+import { Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Save, Trash2, X, MonitorPlay, AlignStartVertical, AlignCenterVertical, AlignEndVertical } from 'lucide-react';
 import { FONT_PRESETS, DEFAULT_PRESETS } from '../types';
 import type { SubtitleStyleState } from '../hooks/useSubtitleStyle';
 
@@ -12,10 +12,10 @@ export const SubtitleStylePanel: React.FC<Props> = ({ style }) => {
     const {
         fontSize, fontColor, fontName, isBold, isItalic,
         outlineSize, shadowSize, outlineColor,
-        bgEnabled, bgColor, bgOpacity, bgPadding, alignment,
+        bgEnabled, bgColor, bgOpacity, bgPadding, alignment, multilineAlign,
         setFontSize, setFontColor, setFontName, setIsBold, setIsItalic,
         setOutlineSize, setShadowSize, setOutlineColor,
-        setBgEnabled, setBgColor, setBgOpacity, setBgPadding, setAlignment,
+        setBgEnabled, setBgColor, setBgOpacity, setBgPadding, setAlignment, setMultilineAlign,
         customPresets, presetNameInput, setPresetNameInput,
         confirmSavePreset, applyPreset, deletePreset,
     } = style;
@@ -273,6 +273,27 @@ export const SubtitleStylePanel: React.FC<Props> = ({ style }) => {
                                     onChange={e => setBgPadding(parseInt(e.target.value))}
                                     className="w-full accent-indigo-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
                                 />
+                            </div>
+                            {/* Multi-line Vertical Alignment */}
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Line Align</label>
+                                <div className="flex gap-1.5">
+                                    {(['bottom', 'center', 'top'] as const).map(mode => (
+                                        <button
+                                            key={mode}
+                                            onClick={() => setMultilineAlign(mode)}
+                                            className={`flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg border text-[11px] font-medium transition-all ${
+                                                multilineAlign === mode
+                                                    ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-300'
+                                                    : 'bg-black/20 border-white/10 text-slate-400 hover:text-white hover:border-white/20'
+                                            }`}
+                                            title={mode === 'bottom' ? 'Bottom aligned' : mode === 'center' ? 'Center aligned' : 'Top aligned'}
+                                        >
+                                            {mode === 'bottom' ? <AlignEndVertical size={12} /> : mode === 'center' ? <AlignCenterVertical size={12} /> : <AlignStartVertical size={12} />}
+                                            {mode === 'bottom' ? 'Bottom' : mode === 'center' ? 'Center' : 'Top'}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     )}

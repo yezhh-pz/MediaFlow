@@ -7,8 +7,8 @@ from loguru import logger
 # Add src to path
 sys.path.append(str(Path.cwd()))
 
-from src.services.asr import ASRService
-from src.config import settings
+from backend.services.asr import ASRService
+from backend.config import settings
 
 # Configuration
 AUDIO_FILE = r"e:\Work\Code\Mediaflow\temp\Oguz Erkan - Charlie Munger： ＂I've had my Berkshire stock decline by 50% three tim... [2019557451784167424].mp4"

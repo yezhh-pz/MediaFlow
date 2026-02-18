@@ -3,11 +3,11 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from src.core.container import container, Services
-from src.services.downloader import DownloaderService
-from src.services.asr import ASRService
-from src.services.task_manager import TaskManager
-from src.config import settings
+from backend.core.container import container, Services
+from backend.services.downloader import DownloaderService
+from backend.services.asr import ASRService
+from backend.services.task_manager import TaskManager
+from backend.config import settings
 
 async def verify_system():
     print("🚀 Starting System Verification...")

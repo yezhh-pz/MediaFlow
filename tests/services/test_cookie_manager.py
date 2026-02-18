@@ -2,7 +2,7 @@ import pytest
 import time
 from pathlib import Path
 import os
-from src.services.cookie_manager import CookieManager
+from backend.services.cookie_manager import CookieManager
 
 def test_save_cookies_netscape_format(tmp_path):
     cm = CookieManager(cookie_dir=tmp_path)

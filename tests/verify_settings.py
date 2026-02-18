@@ -5,8 +5,8 @@ from pathlib import Path
 # Add project root to sys.path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from src.services.settings_manager import settings_manager
-from src.services.translator.llm_translator import llm_translator
+from backend.services.settings_manager import settings_manager
+from backend.services.translator.llm_translator import llm_translator
 
 def test_settings_flow():
     print("1. initializing SettingsManager...")

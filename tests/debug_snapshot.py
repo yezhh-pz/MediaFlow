@@ -9,8 +9,8 @@ from pathlib import Path
 # Add project root to sys.path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from src.services.task_manager import TaskManager
-from src.models.task_model import Task
+from backend.services.task_manager import TaskManager
+from backend.models.task_model import Task
 
 async def recreate_bug():
     print("Loading tasks...")

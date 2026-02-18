@@ -2,7 +2,7 @@ import pytest
 import asyncio
 import threading
 from http.server import SimpleHTTPRequestHandler, HTTPServer
-from src.services.browser_service import browser_service
+from backend.services.browser_service import browser_service
 
 # --- Local Server Setup ---
 HTML_CONTENT = b"""

@@ -53,6 +53,41 @@ export const OutputSettingsPanel: React.FC<Props> = ({ output }) => {
                     </div>
                 </div>
 
+                {/* Resolution Selection */}
+                <div className="space-y-2">
+                    <label className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                        <MonitorPlay size={12} className="text-indigo-400"/> Output Resolution
+                    </label>
+                    <div className="grid grid-cols-5 gap-1.5">
+                        {[
+                            { id: "original", label: "Original" },
+                            { id: "720p", label: "720p (HD)" },
+                            { id: "1080p", label: "1080p" },
+                            { id: "sr_2x", label: "⚡ SR 2x" },
+                            { id: "sr_4x", label: "⚡ SR 4x" },
+                        ].map((opt) => (
+                            <button
+                                key={opt.id}
+                                onClick={() => output.setTargetResolution(opt.id)}
+                                className={`flex items-center justify-center px-2 py-2 rounded-lg text-[10px] font-medium border transition-all ${
+                                    output.targetResolution === opt.id
+                                        ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400'
+                                        : 'bg-black/20 border-white/5 text-slate-500 hover:text-slate-300'
+                                }`}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {output.targetResolution.startsWith('sr_') && (
+                    <div className="text-[10px] text-amber-500 flex items-start gap-1 bg-amber-500/10 p-2 rounded mt-2">
+                        <span>⚡</span>
+                        <span>AI Super Resolution: 先放大原视频再烧字幕，处理时间较长。需要 Real-ESRGAN 二进制文件。</span>
+                    </div>
+                )}
+
                 {/* Filename Input */}
                 <div className="space-y-1.5">
                     <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Filename</label>

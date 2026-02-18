@@ -6,7 +6,7 @@ import numpy as np
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.services.ocr.ocr_engine import RapidOCREngine
+from backend.services.ocr.ocr_engine import RapidOCREngine
 
 def test_ocr():
     print("Initializing RapidOCREngine...")

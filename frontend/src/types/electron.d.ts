@@ -1,6 +1,8 @@
 export interface ElectronAPI {
   sendMessage: (message: any) => void;
-  openFile: () => Promise<{ path: string; name: string; size: number } | null>;
+  openFile: (
+    defaultPath?: string,
+  ) => Promise<{ path: string; name: string; size: number } | null>;
   openSubtitleFile: () => Promise<{ path: string; name: string } | null>;
   readFile: (filePath: string) => Promise<string>;
   showSaveDialog: (options: any) => Promise<any>;

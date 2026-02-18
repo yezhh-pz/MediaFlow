@@ -83,8 +83,14 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     connect();
+
     return () => {
       if (wsRef.current) {
+        // Prevent callbacks from firing after unmount
+        wsRef.current.onopen = null;
+        wsRef.current.onclose = null;
+        wsRef.current.onerror = null;
+        wsRef.current.onmessage = null;
         wsRef.current.close();
       }
       if (reconnectTimeoutRef.current) {

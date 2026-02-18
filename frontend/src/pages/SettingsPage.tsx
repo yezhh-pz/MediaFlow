@@ -1,23 +1,8 @@
 
 import React, { useEffect, useState } from "react";
 import { apiClient } from "../api/client";
+import type { LLMProvider, UserSettings } from "../types/api";
 import { Plus, Edit2, Trash2, CheckCircle, X, AlertCircle, Settings, Cpu, HardDrive, Shield, MonitorPlay } from "lucide-react";
-
-interface LLMProvider {
-    id: string;
-    name: string;
-    base_url: string;
-    api_key: string;
-    model: string;
-    is_active: boolean;
-}
-
-interface UserSettings {
-    llm_providers: LLMProvider[];
-    language: string;
-    auto_execute_flow: boolean;
-    default_download_path: string | null;
-}
 
 interface Notification {
     message: string;

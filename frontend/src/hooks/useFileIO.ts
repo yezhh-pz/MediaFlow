@@ -179,7 +179,8 @@ export const useFileIO = () => {
   };
 
   const handleOpenInEditor = async () => {
-    if (!sourceFilePath || targetSegments.length === 0) return;
+    if (!sourceFilePath || targetSegments.length === 0 || !window.electronAPI)
+      return;
 
     // 1. Resolve video path (try multiple extensions)
     const basePath = sourceFilePath.replace(/\.(srt|ass|vtt)$/i, "");
@@ -194,20 +195,67 @@ export const useFileIO = () => {
       } catch {}
     }
 
-    // 2. Set Editor Store
-    const { setRegions, setCurrentFilePath, setMediaUrl } =
-      useEditorStore.getState();
-
-    setRegions(targetSegments);
-
-    if (videoPath) {
-      setCurrentFilePath(videoPath);
-      const normalizedPath = videoPath.replace(/\\/g, "/");
-      setMediaUrl(`file:///${normalizedPath}`);
+    if (!videoPath) {
+      // Fallback: If we can't find the video, we can't fully open the editor state via session
+      // But maybe we can guess or use the source if it IS a video?
+      // For now, assume video exists or warn.
+      console.warn("Could not find associated video file.");
+      alert(
+        "Could not find associated video file. Opening editor might be incomplete.",
+      );
+      // We will try to proceed with a best guess or just the source path if it looks like video?
+      // Actually, if sourceFilePath IS a video, basePath + ext might be weird.
+      // Assuming sourceFilePath is .srt for now as per logic.
     }
-    // else: no matching video found, keep editor's current video (or empty)
 
-    // 3. Navigate
+    // 2. Determine target subtitle path (e.g. _CN.srt)
+    const LANG_SUFFIX_MAP: Record<string, string> = {
+      Chinese: "_CN",
+      English: "_EN",
+      Japanese: "_JP",
+      Spanish: "_ES",
+      French: "_FR",
+      German: "_DE",
+      Russian: "_RU",
+    };
+    const suffix = LANG_SUFFIX_MAP[targetLang] || "_CN";
+
+    let targetSrtPath = sourceFilePath;
+    const lastDot = targetSrtPath.lastIndexOf(".");
+    if (lastDot > 0) targetSrtPath = targetSrtPath.substring(0, lastDot);
+    targetSrtPath += `${suffix}.srt`;
+
+    // 3. Save the translation to disk (Auto-Save)
+    try {
+      let content = "";
+      targetSegments.forEach((seg, index) => {
+        const startStr = formatTimestamp(seg.start);
+        const endStr = formatTimestamp(seg.end);
+        content += `${index + 1}\n${startStr} --> ${endStr}\n${seg.text || ""}\n\n`;
+      });
+
+      await window.electronAPI.writeFile(targetSrtPath, content);
+      console.log("[Translator] Auto-saved translation to:", targetSrtPath);
+    } catch (e) {
+      console.error("Failed to auto-save translation before opening editor", e);
+      alert(
+        "Failed to save translation file. Editor might not load the correct file.",
+      );
+      return;
+    }
+
+    // 4. Set Session Storage for Navigation
+    // This payload tells the Editor (and App.tsx) to load this specific video and subtitle
+    sessionStorage.setItem(
+      "mediaflow:pending_file",
+      JSON.stringify({
+        video_path: videoPath || basePath + ".mp4", // Best effort
+        subtitle_path: targetSrtPath,
+        target: "editor",
+      }),
+    );
+
+    // 5. Navigate
     NavigationService.navigate("editor");
   };
 

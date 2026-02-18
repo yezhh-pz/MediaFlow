@@ -3,10 +3,11 @@ import type {
   OCRExtractRequest,
   OCRExtractResponse,
   TaskResponse,
-  TextEvent,
+  TaskResponse,
+  OCRTextEvent,
 } from "../api/client";
 
-export type { TextEvent, OCRExtractRequest, OCRExtractResponse };
+export type { OCRTextEvent, OCRExtractRequest, OCRExtractResponse };
 
 export const ocrService = {
   extractText: async (params: OCRExtractRequest): Promise<TaskResponse> => {

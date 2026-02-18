@@ -3,7 +3,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
   sendMessage: (message: any) => ipcRenderer.send("message-from-ui", message),
-  openFile: () => ipcRenderer.invoke("dialog:openFile"),
+  openFile: (defaultPath?: string) =>
+    ipcRenderer.invoke("dialog:openFile", defaultPath),
   openSubtitleFile: () => ipcRenderer.invoke("dialog:openSubtitleFile"),
   readFile: (filePath: string) => ipcRenderer.invoke("fs:readFile", filePath),
   showSaveDialog: (options: any) =>

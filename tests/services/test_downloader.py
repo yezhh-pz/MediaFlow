@@ -1,5 +1,5 @@
-from src.services.downloader.progress import clean_ansi
-from src.services.downloader import DownloaderService
+from backend.services.downloader.progress import clean_ansi
+from backend.services.downloader import DownloaderService
 
 def test_clean_ansi():
     """Test removal of ANSI escape sequences from strings."""
@@ -11,6 +11,6 @@ def test_clean_ansi():
 
 def test_downloader_init():
     """Test downloader service initialized with correct output dir."""
-    from src.config import settings
+    from backend.config import settings
     service = DownloaderService()
     assert service.output_dir == settings.TEMP_DIR

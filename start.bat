@@ -21,3 +21,6 @@ echo    System Started!
 echo    - Backend running in separate window
 echo    - Frontend launching...
 echo ==========================================
+
+### npm run dev
+### python run.py

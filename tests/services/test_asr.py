@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from src.services.asr import ASRService
-from src.utils.subtitle_manager import SubtitleManager
-from src.utils.audio_processor import AudioProcessor
+from backend.services.asr import ASRService
+from backend.utils.subtitle_manager import SubtitleManager
+from backend.utils.audio_processor import AudioProcessor
 
 @pytest.fixture
 def asr_service():

@@ -1,7 +1,59 @@
 import { API_BASE_URL } from "../config/api";
 
-// Backend API base URL (HTTP)
-// Mutable to allow dynamic configuration
+// Re-export all API types for consumers
+export type {
+  MessageResponse,
+  CountResponse,
+  StatusMessageResponse,
+  TaskResponse,
+  HealthResponse,
+  PipelineStep,
+  PipelineRequest,
+  PlaylistItem,
+  AnalyzeResult,
+  ElectronCookie,
+  CookieStatusResponse,
+  LLMProvider,
+  UserSettings,
+  ActiveProviderResponse,
+  DetectSilenceResponse,
+  ImagePreviewResponse,
+  SynthesizeOptions,
+  SynthesizeRequest,
+  TranscribeSegmentRequest,
+  TranscribeSegmentResponse,
+  TranslateRequest,
+  TranslateResponse,
+  OCRTextEvent,
+  OCRExtractRequest,
+  OCRExtractResponse,
+} from "../types/api";
+
+// Internal imports (used within this file)
+import type {
+  MessageResponse,
+  CountResponse,
+  StatusMessageResponse,
+  TaskResponse,
+  HealthResponse,
+  PipelineRequest,
+  AnalyzeResult,
+  ElectronCookie,
+  CookieStatusResponse,
+  UserSettings,
+  ActiveProviderResponse,
+  DetectSilenceResponse,
+  ImagePreviewResponse,
+  SynthesizeRequest,
+  TranscribeSegmentRequest,
+  TranscribeSegmentResponse,
+  TranslateRequest,
+  TranslateResponse,
+  OCRExtractRequest,
+  OCRTextEvent,
+} from "../types/api";
+
+// Backend API base URL (HTTP) — mutable for dynamic configuration
 export let API_BASE = API_BASE_URL;
 
 export const initializeApi = (config: {
@@ -15,227 +67,15 @@ export const initializeApi = (config: {
 };
 
 export const getWsUrl = () => {
-  // Naive replacement, can be improved if config has explicit ws_url
   return API_BASE.replace(/^http/, "ws") + "/ws/tasks";
 };
-
-// ─── Shared / Generic Response Types ─────────────────────────────
-
-/** Common message-only response from mutation endpoints. */
-export interface MessageResponse {
-  message: string;
-}
-
-/** Endpoints that return a message + affected count (cancel-all, delete-all). */
-export interface CountResponse extends MessageResponse {
-  count: number;
-}
-
-/** Endpoints that return a message + status (resume, etc.). */
-export interface StatusMessageResponse extends MessageResponse {
-  status: string;
-}
-
-// ─── API Client Setup ─────────────────────────────────────────────
-// (Assuming you have an axios instance somewhere, or code handling fetch using API_BASE)
-// Since this file seems to define types and exports API_BASE,
-// let's create a minimal axios wrapper or ensure existing code uses the exported API_BASE variable.
-// But `API_BASE` is a const in original file. We changed it to let.
-
-/** Task creation / pipeline submission response. */
-export interface TaskResponse {
-  task_id: string;
-  status: string;
-  message?: string;
-}
-
-// ─── Health ──────────────────────────────────────────────────────
-
-export interface HealthResponse {
-  status: string;
-  service: string;
-  version: string;
-}
-
-// ─── Pipeline ────────────────────────────────────────────────────
-
-export interface PipelineStep {
-  step_name: string;
-  params: Record<string, unknown>;
-}
-
-export interface PipelineRequest {
-  pipeline_id: string;
-  task_name?: string;
-  steps: PipelineStep[];
-}
-
-// ─── Analyze ─────────────────────────────────────────────────────
-
-export interface PlaylistItem {
-  index: number;
-  title: string;
-  url: string;
-  duration?: number;
-}
-
-export interface AnalyzeResult {
-  type: "single" | "playlist";
-  id?: string;
-  title?: string;
-  url?: string;
-  direct_src?: string; // Direct video source (sniffed by backend)
-  thumbnail?: string;
-  duration?: number;
-  count?: number;
-  uploader?: string;
-  items?: PlaylistItem[];
-  extra_info?: Record<string, unknown>; // Flexible field for cookies etc
-}
-
-// ─── Cookies ─────────────────────────────────────────────────────
-
-export interface ElectronCookie {
-  name: string;
-  value: string;
-  domain: string;
-  path?: string;
-  expirationDate?: number;
-  httpOnly?: boolean;
-  secure?: boolean;
-}
-
-export interface CookieStatusResponse {
-  domain: string;
-  has_valid_cookies: boolean;
-  cookie_path: string | null;
-}
-
-// ─── Settings ────────────────────────────────────────────────────
-
-export interface LLMProvider {
-  id: string;
-  name: string;
-  base_url: string;
-  api_key: string;
-  model: string;
-  is_active: boolean;
-}
-
-export interface UserSettings {
-  llm_providers: LLMProvider[];
-  default_download_path: string | null;
-  language: string;
-  auto_execute_flow: boolean;
-}
-
-export interface ActiveProviderResponse {
-  status: string;
-  active_provider_id: string;
-}
-
-// ─── Audio ───────────────────────────────────────────────────────
-
-export interface DetectSilenceResponse {
-  silence_intervals: [number, number][];
-}
-
-// ─── Editor ──────────────────────────────────────────────────────
-
-export interface ImagePreviewResponse {
-  png_path: string;
-  data_url: string;
-  width: number;
-  height: number;
-}
-
-export interface SynthesizeOptions {
-  // Subtitle style
-  font_name?: string;
-  font_size?: number;
-  font_color?: string; // ASS &HAABBGGRR format
-  bold?: boolean;
-  italic?: boolean;
-  outline?: number; // 0-4
-  shadow?: number; // 0-4
-  outline_color?: string; // ASS &HAABBGGRR format
-  back_color?: string; // ASS &HAABBGGRR format
-  border_style?: number; // 1=outline+shadow, 3=opaque box
-  alignment?: number; // ASS numpad: 1=left, 2=center, 3=right (bottom row)
-  margin_v?: number;
-  // Encoding
-  crf?: number;
-  [key: string]: unknown; // extensible (wm_*, video_*, output_path, preset)
-}
-
-export interface SynthesizeRequest {
-  video_path: string;
-  srt_path: string;
-  watermark_path: string | null;
-  output_path?: string | null;
-  options: SynthesizeOptions;
-}
-
-export interface TranscribeSegmentRequest extends SynthesizeRequest {
-  audio_path: string;
-  start: number;
-  end: number;
-  model?: string;
-  device?: string;
-  language?: string;
-  initial_prompt?: string;
-}
-
-export interface TranscribeSegmentResponse {
-  status: "completed" | "pending";
-  task_id?: string;
-  data?: {
-    text: string;
-    segments: any[];
-  };
-  message?: string;
-}
-
-// ─── Translate ─────────────────────────────────────────────────────
-
-export interface TranslateRequest {
-  segments: any[]; // SubtitleSegment[]
-  target_language: string;
-  mode?: "standard" | "intelligent";
-  context_path?: string | null;
-}
-
-export interface TranslateResponse {
-  task_id: string;
-  status: string;
-  segments?: any[]; // SubtitleSegment[]
-}
-
-// ─── OCR ───────────────────────────────────────────────────────────
-
-export interface TextEvent {
-  start: number;
-  end: number;
-  text: string;
-  box: number[][]; // [[x1, y1], [x2, y2], [x3, y3], [x4, y4]]
-}
-
-export interface OCRExtractRequest {
-  video_path: string;
-  roi?: number[]; // [x, y, w, h]
-  engine: "rapid" | "paddle";
-  sample_rate?: number;
-}
-
-export interface OCRExtractResponse {
-  events: TextEvent[];
-}
 
 // ─── Internal Generic Request Wrapper ────────────────────────────
 
 async function request<T>(
   endpoint: string,
   options: RequestInit = {},
+  timeoutMs: number = 30_000,
 ): Promise<T> {
   const url = endpoint.startsWith("http") ? endpoint : `${API_BASE}${endpoint}`;
 
@@ -248,8 +88,16 @@ async function request<T>(
     headers["Content-Type"] = "application/json";
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    const res = await fetch(url, { ...options, headers });
+    const res = await fetch(url, {
+      ...options,
+      headers,
+      signal: options.signal ?? controller.signal,
+    });
+    clearTimeout(timeout);
 
     if (!res.ok) {
       let errorMessage = `API request failed: ${res.status} ${res.statusText}`;
@@ -278,6 +126,15 @@ async function request<T>(
     // For non-JSON responses (like void actions), return generic success if needed
     return {} as T;
   } catch (error: unknown) {
+    clearTimeout(timeout);
+    if (error instanceof DOMException && error.name === "AbortError") {
+      const msg = `Request to ${endpoint} timed out after ${timeoutMs}ms`;
+      console.error(msg);
+      import("../utils/toast").then(({ toast }) => {
+        toast.error(msg);
+      });
+      throw new Error(msg);
+    }
     const errorMsg =
       error instanceof Error ? error.message : "An unexpected error occurred";
     console.error(`Status: Error requesting ${endpoint}`, error);
@@ -314,6 +171,12 @@ export const apiClient = {
       method: "POST",
       body: JSON.stringify(payload),
     });
+  },
+
+  getOcrResults: (videoPath: string) => {
+    return request<{ events: OCRTextEvent[] }>(
+      `/ocr/results?video_path=${encodeURIComponent(videoPath)}`,
+    );
   },
 
   checkHealth: () => {
@@ -434,5 +297,39 @@ export const apiClient = {
     return request<ImagePreviewResponse | null>(
       "/editor/preview/watermark/latest",
     );
+  },
+
+  getPeaks: (videoPath: string) => {
+    // Return raw ArrayBuffer
+    return fetch(
+      `${API_BASE}/editor/peaks?video_path=${encodeURIComponent(videoPath)}`,
+    ).then((res) => {
+      if (!res.ok) throw new Error("Failed to load peaks");
+      return res.arrayBuffer();
+    });
+  },
+
+  // ─── Preprocessing ───────────────────────────────────────────────
+  enhanceVideo: (payload: {
+    video_path: string;
+    model?: string;
+    scale?: string;
+    method?: string;
+  }) => {
+    return request<TaskResponse>("/preprocessing/enhance", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  cleanVideo: (payload: {
+    video_path: string;
+    roi: [number, number, number, number];
+    method?: string;
+  }) => {
+    return request<TaskResponse>("/preprocessing/clean", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 };

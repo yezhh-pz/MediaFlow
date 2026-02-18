@@ -4,12 +4,11 @@
  * Handles: dialog:openFile, dialog:openSubtitleFile, dialog:selectDirectory,
  *          dialog:saveFile, fs:readFile, fs:writeFile, fs:getFileSize
  */
-const { ipcMain, dialog } = require("electron");
-const path = require("path");
-const fs = require("fs");
+import { ipcMain, dialog, app } from "electron";
+import path from "path";
+import fs from "fs";
 
 // ─── Preferences Persistence ────────────────────────────────────
-const { app } = require("electron");
 
 function getStorePath() {
   return path.join(app.getPath("userData"), "user-preferences.json");
@@ -49,11 +48,26 @@ function ensureLoaded() {
 }
 
 function getDefaultStartPath(): string | undefined {
-  const projectRoot = path.resolve(__dirname, "../../");
-  const tempDir = path.join(projectRoot, "temp");
+  const appPath = app.getAppPath();
+  // In dev: appPath is '.../frontend'
+  // Workspace is sibling: '.../workspace'
+  const workspaceDir = path.resolve(appPath, "../workspace");
+
   let startPath = lastOpenDir;
-  if (!startPath && fs.existsSync(tempDir)) {
-    startPath = tempDir;
+
+  // If no last open dir, default to workspace if exists
+  if (!startPath) {
+    if (fs.existsSync(workspaceDir)) {
+      startPath = workspaceDir;
+    } else {
+      // Fallback to app path if workspace missing
+      startPath = appPath;
+    }
+  } else {
+    // Access check
+    if (!fs.existsSync(startPath)) {
+      startPath = fs.existsSync(workspaceDir) ? workspaceDir : appPath;
+    }
   }
   return startPath;
 }
@@ -61,43 +75,55 @@ function getDefaultStartPath(): string | undefined {
 // ─── Handler Registration ───────────────────────────────────────
 export function registerDialogHandlers() {
   // Open media file
-  ipcMain.handle("dialog:openFile", async () => {
-    ensureLoaded();
+  ipcMain.handle(
+    "dialog:openFile",
+    async (_event: any, defaultPath?: string) => {
+      ensureLoaded();
 
-    const { canceled, filePaths } = await dialog.showOpenDialog({
-      properties: ["openFile"],
-      defaultPath: getDefaultStartPath(),
-      filters: [
-        {
-          name: "Media Files",
-          extensions: ["mp4", "mkv", "avi", "mp3", "wav"],
-        },
-      ],
-    });
+      const { canceled, filePaths } = await dialog.showOpenDialog({
+        properties: ["openFile"],
+        defaultPath: defaultPath || getDefaultStartPath(),
+        filters: [
+          {
+            name: "Media Files",
+            extensions: [
+              "mp4",
+              "mkv",
+              "avi",
+              "mov",
+              "jpg",
+              "jpeg",
+              "png",
+              "webp",
+            ],
+          },
+        ],
+      });
 
-    if (canceled || filePaths.length === 0) {
-      return null;
-    }
+      if (canceled || filePaths.length === 0) {
+        return null;
+      }
 
-    const filePath = filePaths[0];
-    lastOpenDir = path.dirname(filePath);
-    if (lastOpenDir) saveLastOpenDir(lastOpenDir);
-    try {
-      const stats = fs.statSync(filePath);
-      return {
-        path: filePath,
-        name: path.basename(filePath),
-        size: stats.size,
-      };
-    } catch (e) {
-      console.error("Failed to stat file:", e);
-      return {
-        path: filePath,
-        name: path.basename(filePath),
-        size: 0,
-      };
-    }
-  });
+      const filePath = filePaths[0];
+      lastOpenDir = path.dirname(filePath);
+      if (lastOpenDir) saveLastOpenDir(lastOpenDir);
+      try {
+        const stats = fs.statSync(filePath);
+        return {
+          path: filePath,
+          name: path.basename(filePath),
+          size: stats.size,
+        };
+      } catch (e) {
+        console.error("Failed to stat file:", e);
+        return {
+          path: filePath,
+          name: path.basename(filePath),
+          size: 0,
+        };
+      }
+    },
+  );
 
   // Open subtitle file
   ipcMain.handle("dialog:openSubtitleFile", async () => {

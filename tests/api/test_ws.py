@@ -1,8 +1,8 @@
 import pytest
 import asyncio
 from fastapi.testclient import TestClient
-from src.main import app
-from src.services.task_manager import task_manager
+from backend.main import app
+from backend.services.task_manager import task_manager
 
 def test_websocket_connection(client: TestClient):
     with client.websocket_connect("/api/v1/ws/tasks") as websocket:
@@ -40,7 +40,7 @@ async def test_task_update_broadcast():
     mock_ws = MockWS()
     await task_manager.connect(mock_ws)
     
-    from src.models.task_model import Task
+    from backend.models.task_model import Task
     import time
     
     # Create a real Task object

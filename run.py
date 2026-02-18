@@ -1,7 +1,7 @@
 import sys
 import asyncio
 import uvicorn
-from src.config import settings
+from backend.config import settings
 
 def main():
     # Critical: Force ProactorEventLoop on Windows BEFORE uvicorn starts
@@ -12,7 +12,7 @@ def main():
     try:
         # Run Uvicorn via API, not CLI, to ensure our policy sticks
         uvicorn.run(
-            "src.main:app", 
+            "backend.main:app", 
             host=settings.HOST, 
             port=settings.PORT, 
             reload=False # Disable reload to ensure Policy sticks in the main process

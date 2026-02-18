@@ -19,6 +19,7 @@ export interface SubtitleStyleState {
   bgOpacity: number;
   bgPadding: number;
   alignment: number;
+  multilineAlign: "bottom" | "center" | "top";
   // Setters
   setFontSize: (v: number) => void;
   setFontColor: (v: string) => void;
@@ -33,6 +34,7 @@ export interface SubtitleStyleState {
   setBgOpacity: (v: number) => void;
   setBgPadding: (v: number) => void;
   setAlignment: (v: number) => void;
+  setMultilineAlign: (v: "bottom" | "center" | "top") => void;
   // Presets
   customPresets: SubtitlePreset[];
   presetNameInput: string | null;
@@ -68,6 +70,9 @@ export function useSubtitleStyle(
   const [bgOpacity, setBgOpacity] = useState(0.5);
   const [bgPadding, setBgPadding] = useState(5);
   const [alignment, setAlignment] = useState(2);
+  const [multilineAlign, setMultilineAlign] = useState<
+    "bottom" | "center" | "top"
+  >("center");
   const [customPresets, setCustomPresets] = useState<SubtitlePreset[]>([]);
   const [presetNameInput, setPresetNameInput] = useState<string | null>(null);
   const [subPos, setSubPos] = useState({ x: 0.5, y: 0.9 });
@@ -103,6 +108,7 @@ export function useSubtitleStyle(
       const savedBgOpacity = localStorage.getItem("sub_bgOpacity");
       const savedBgPadding = localStorage.getItem("sub_bgPadding");
       const savedAlignment = localStorage.getItem("sub_alignment");
+      const savedMultilineAlign = localStorage.getItem("sub_multilineAlign");
       const savedFontSize = localStorage.getItem("sub_fontSize");
       const savedFontColor = localStorage.getItem("sub_fontColor");
       const savedSubPos = localStorage.getItem("sub_pos");
@@ -136,6 +142,12 @@ export function useSubtitleStyle(
         if (!isNaN(v)) setBgPadding(v);
       }
       if (savedAlignment) setAlignment(parseInt(savedAlignment) || 2);
+      if (
+        savedMultilineAlign &&
+        ["bottom", "center", "top"].includes(savedMultilineAlign)
+      ) {
+        setMultilineAlign(savedMultilineAlign as "bottom" | "center" | "top");
+      }
       if (savedFontSize) setFontSize(parseInt(savedFontSize) || 24);
       if (savedFontColor) setFontColor(savedFontColor);
 
@@ -180,6 +192,7 @@ export function useSubtitleStyle(
     localStorage.setItem("sub_bgOpacity", String(bgOpacity));
     localStorage.setItem("sub_bgPadding", String(bgPadding));
     localStorage.setItem("sub_alignment", String(alignment));
+    localStorage.setItem("sub_multilineAlign", multilineAlign);
     localStorage.setItem("sub_fontSize", String(fontSize));
     localStorage.setItem("sub_fontColor", fontColor);
   }, [
@@ -194,6 +207,7 @@ export function useSubtitleStyle(
     bgOpacity,
     bgPadding,
     alignment,
+    multilineAlign,
     fontSize,
     fontColor,
   ]);
@@ -263,6 +277,7 @@ export function useSubtitleStyle(
     bgOpacity,
     bgPadding,
     alignment,
+    multilineAlign,
     setFontSize,
     setFontColor,
     setFontName,
@@ -276,6 +291,7 @@ export function useSubtitleStyle(
     setBgOpacity,
     setBgPadding,
     setAlignment,
+    setMultilineAlign,
     customPresets,
     presetNameInput,
     setPresetNameInput,

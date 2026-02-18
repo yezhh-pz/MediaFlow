@@ -1,4 +1,4 @@
-from src.services.downloader import downloader_service
+from backend.services.downloader import downloader_service
 from pathlib import Path
 import os
 

@@ -8,12 +8,12 @@ from pathlib import Path
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.core.container import container, Services
-from src.services.task_manager import TaskManager
-from src.core.database import init_db, get_session_context
-from src.api.v1.translate import run_translation_task, TranslateRequest
-from src.models.schemas import SubtitleSegment
-from src.services.settings_manager import SettingsManager
+from backend.core.container import container, Services
+from backend.services.task_manager import TaskManager
+from backend.core.database import init_db, get_session_context
+from backend.api.v1.translate import run_translation_task, TranslateRequest
+from backend.models.schemas import SubtitleSegment
+from backend.services.settings_manager import SettingsManager
 from unittest.mock import MagicMock
 
 async def register_services():
@@ -23,8 +23,8 @@ async def register_services():
     # TaskManager needs DB, assuming it handles it
     container.register(Services.TASK_MANAGER, lambda: TaskManager())
     
-    from src.services.translator.llm_translator import LLMTranslator
-    from src.services.translator.glossary_service import GlossaryService
+    from backend.services.translator.llm_translator import LLMTranslator
+    from backend.services.translator.glossary_service import GlossaryService
 
     container.register(Services.LLM_TRANSLATOR, lambda: LLMTranslator())
     container.register(Services.GLOSSARY, lambda: GlossaryService())
@@ -111,7 +111,7 @@ async def main():
     # Now verification
     print("Verifying DB State...")
     async with get_session_context() as session:
-        from src.models.task_model import Task
+        from backend.models.task_model import Task
         task = await session.get(Task, task_id)
         
         if not task:

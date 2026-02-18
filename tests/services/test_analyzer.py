@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from src.services.analyzer import analyzer_service
-from src.models.schemas import AnalyzeResult
+from backend.services.analyzer import analyzer_service
+from backend.models.schemas import AnalyzeResult
 
 @pytest.mark.asyncio
 async def test_analyze_single_video():
